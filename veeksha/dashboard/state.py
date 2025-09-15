@@ -13,7 +13,6 @@ class LiveRequestInfo:
     request_id: str
     start_timestamp: float
     input_tokens: int
-    expected_output_tokens: int
     current_output_tokens: int = 0
     ttft_ms: Optional[float] = None
     current_tpot_ms: Optional[float] = None
@@ -95,7 +94,6 @@ class DashboardState:
             request_id=event.request_id,
             start_timestamp=event.timestamp,
             input_tokens=event.input_tokens,
-            expected_output_tokens=event.expected_output_tokens
         )
         
         self.aggregate_stats.total_requests += 1
@@ -109,9 +107,7 @@ class DashboardState:
             req.current_tpot_ms = event.current_tpot_ms
             req.is_waiting_first_token = not event.is_first_token and req.ttft_ms is None
             
-            if req.expected_output_tokens > 0:
-                req.progress_pct = min(100.0, 
-                    (req.current_output_tokens / req.expected_output_tokens) * 100)
+            # TODO: how to calculate progress?
     
     def _handle_request_completed(self, event: RequestCompletedEvent) -> None:
         # Remove from live requests + update aggregate stats

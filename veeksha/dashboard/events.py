@@ -8,7 +8,6 @@ class RequestStartedEvent:
     request_id: str
     timestamp: float
     input_tokens: int
-    expected_output_tokens: int
 
 @dataclass  
 class TokenBatchEvent:
