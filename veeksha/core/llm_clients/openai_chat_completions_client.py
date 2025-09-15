@@ -117,6 +117,8 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
         if isinstance(request_config.sampling_params, dict):
             max_tokens_limit = request_config.sampling_params.get("max_tokens")
 
+        last_token_batch_emission = 0
+
         try:
             async with session.post(address, json=body, headers=headers) as response:
                 response.raise_for_status()
@@ -177,6 +179,24 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                             and tokens_received >= max_tokens_limit
                         ):
                             break
+
+                    if tokens_received_chunk > 0 and (tokens_received - last_token_batch_emission) >= 10: # TODO: make this configurable/a constant
+                        current_ttft_ms = inter_token_times[0] * 1000 if inter_token_times else None
+                        current_tpot_ms = None
+                        if len(inter_token_times) > 1:
+                            from statistics import mean
+                            current_tpot_ms = mean(inter_token_times[1:]) * 1000
+
+                        emit_dashboard_event(TokenBatchEvent(
+                            request_id=request_id,
+                            timestamp=time.time(),
+                            tokens_received_this_batch=tokens_received_chunk,
+                            total_output_tokens=tokens_received,
+                            ttft_ms=current_ttft_ms,
+                            current_tpot_ms=current_tpot_ms,
+                            is_first_token=(len(inter_token_times) == 1)
+                        ))
+                        last_token_batch_emission = tokens_received
 
         except aiohttp.ClientResponseError as e:
             error_response_code = e.status

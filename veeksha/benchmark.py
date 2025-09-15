@@ -22,6 +22,8 @@ from veeksha.config.utils import prepare_benchmark_output_dir
 from veeksha.core.hf_utils import get_tokenizer
 from veeksha.core.requests_launcher import RequestsLauncher
 from veeksha.core.response import Response
+from veeksha.dashboard.pipeline import emit_dashboard_event
+from veeksha.dashboard.events import RequestStartedEvent, BenchmarkStatusEvent
 from veeksha.generators.request_generator.base_generator import BaseRequestGenerator
 from veeksha.generators.request_generator.generator_registry import (
     RequestGeneratorRegistry,
@@ -182,6 +184,12 @@ def dispatch_requests(
             # if another thread has set the stop event we don't send the request
             if stop_event.is_set():
                 continue
+        
+            emit_dashboard_event(RequestStartedEvent(
+                request_id = request_config.id,
+                timestamp = time.time(),
+                input_tokens = request_config.prompt[1]
+            ))
 
             # dispatch
             service_metrics.register_launched_request()
@@ -228,6 +236,14 @@ def process_results(
         service_metrics.add_request_metrics(request_metrics)
         if generated_response is not None:
             generated_responses.append(generated_response)
+        
+        emit_dashboard_event(RequestCompletedEvent(
+            request_id = request_metrics.request_id,
+            timestamp = time.time(),
+            final_metrics = request_metrics,
+        ))
+
+        # TODO: maybe add benchmark status event here?
 
         pbar.update(service_metrics.num_completed_requests - pbar.n)
 

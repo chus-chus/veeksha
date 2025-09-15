@@ -21,7 +21,6 @@ from veeksha.types import RequestGeneratorType
 
 logger = init_logger(__name__)
 
-
 @frozen_dataclass(allow_from_file=True)
 class BenchmarkConfig:
     seed: int = field(
@@ -58,6 +57,10 @@ class BenchmarkConfig:
     request_generator_config: BaseRequestGeneratorConfig = field(
         default_factory=SyntheticRequestGeneratorConfig,
         metadata={"help": "The request generator configuration for the benchmark."},
+    )
+    dashboard_config: DashboardConfig = field(
+        default_factory=DashboardConfig,
+        metadata={"help": "Dashboard configuration"}
     )
 
     def __post_init__(self):
@@ -106,4 +109,20 @@ class BenchmarkConfig:
             logger.debug("Flat config not found or is None. Using dataclass_to_dict.")
             return dataclass_to_dict(self)
 
-        return flat_config.__dict__  # type: ignore
+        return self.__flat_config__.__dict__  # type: ignore
+
+
+@datacalss
+class DashboardConfig:
+    enabled: bool = field(
+        default=True,
+        metadata={"help": "Enable real-time dashboard"}
+    )
+    max_live_requests: int = field(
+        default=50, 
+        metadata={"help": "Maximum number of live requests to track"}
+    )
+    max_queue_size: int = field(
+        default=1000,
+        metadata={"help": "Maximum dashboard event queue size"}
+    )
