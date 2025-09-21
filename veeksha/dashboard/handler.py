@@ -2,10 +2,12 @@ import logging
 import queue
 import threading
 from logging.handlers import QueueHandler, QueueListener
+from multiprocessing import Manager
 from typing import Optional
 
 from veeksha.dashboard.events import DashboardEvent
 from veeksha.dashboard.state import DashboardState
+
 
 class DashboardEventHandler(logging.Handler):
     """Converts log records to dashboard events and applies them to state"""
@@ -27,7 +29,8 @@ class DashboardEventHandlerProcessor:
     """Main pipeline for dashboard event processing"""
     
     def __init__(self, max_queue_size: int = 1000, max_live_requests: int = 50):
-        self.event_queue = queue.Queue(maxsize=max_queue_size)
+        self.manager = Manager()
+        self.event_queue = self.manager.Queue(maxsize=max_queue_size)
         self.dashboard_state = DashboardState(max_live_requests=max_live_requests)
         self.event_handler = DashboardEventHandler(self.dashboard_state)
         self.queue_listener: Optional[QueueListener] = None
@@ -57,6 +60,8 @@ class DashboardEventHandlerProcessor:
         if self.queue_listener and self.is_running:
             self.queue_listener.stop()
             self.is_running = False
+        if self.manager:
+            self.manager.shutdown()
     
     def emit_event(self, event: DashboardEvent) -> None:
         """Emit a dashboard event. Non-blocking."""
@@ -64,25 +69,38 @@ class DashboardEventHandlerProcessor:
             try:
                 self.logger.debug("Dashboard event", extra={'dashboard_event': event})
             except queue.Full:
-                pass # simply drop events if dashboard can't keep up
+                pass  # simply drop events if dashboard can't keep up
 
 # Global event processor singleton
 _dashboard_event_processor: Optional[DashboardEventHandlerProcessor] = None
+_dashboard_init_lock = threading.Lock()
 
 def get_dashboard_event_processor() -> Optional[DashboardEventHandlerProcessor]:
     """Get the global dashboard processor instance"""
     return _dashboard_event_processor
 
+
+def stop_dashboard_event_processor() -> None:
+    """Stop the global dashboard event processor"""
+    global _dashboard_event_processor
+    if _dashboard_event_processor:
+        _dashboard_event_processor.stop()
+        _dashboard_event_processor = None
+
+
 def init_dashboard_event_processor(enabled: bool = True, **kwargs) -> Optional[DashboardState]:
-    """Initialize the global dashboard event processor"""
+    """Initialize the global dashboard event processor. This is thread-safe and idempotent."""
     global _dashboard_event_processor
     
     if not enabled:
         _dashboard_event_processor = None
         return None
-        
-    _dashboard_event_processor = DashboardEventHandlerProcessor(**kwargs)
-    return _dashboard_event_processor.start()
+    
+    with _dashboard_init_lock:
+        if _dashboard_event_processor is None:
+            _dashboard_event_processor = DashboardEventHandlerProcessor(**kwargs)
+            return _dashboard_event_processor.start()
+        return _dashboard_event_processor.dashboard_state
 
 def emit_dashboard_event(event: DashboardEvent) -> None:
     """Emit a dashboard event to the global pipeline."""

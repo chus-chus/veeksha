@@ -11,6 +11,8 @@ from veeksha.core.request_config import RequestConfig
 from veeksha.core.response import Response
 from veeksha.logger import init_logger
 from veeksha.metrics.request_metrics import RequestMetrics
+from veeksha.dashboard.handler import emit_dashboard_event
+from veeksha.dashboard.events import TokenBatchEvent
 
 logger = init_logger(__name__)
 
@@ -245,7 +247,7 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
                             current_tpot_ms = mean(inter_token_times[1:]) * 1000
 
                         emit_dashboard_event(TokenBatchEvent(
-                            request_id=request_id,
+                            request_id=request_config.id,
                             timestamp=time.time(),
                             tokens_received_this_batch=tokens_received_chunk,
                             total_output_tokens=tokens_received,
@@ -277,6 +279,7 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
             )
 
         metrics = RequestMetrics(
+            request_id=request_config.id,
             request_dispatched_at=request_dispatched_at,
             inter_token_times=inter_token_times,
             num_prompt_tokens=prompt_len,

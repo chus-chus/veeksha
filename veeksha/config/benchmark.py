@@ -22,6 +22,20 @@ from veeksha.types import RequestGeneratorType
 logger = init_logger(__name__)
 
 @frozen_dataclass(allow_from_file=True)
+class DashboardConfig:
+    enabled: bool = field(
+        default=True,
+        metadata={"help": "Enable real-time dashboard"}
+    )
+    max_live_requests: int = field(
+        default=50, 
+        metadata={"help": "Maximum number of live requests to track"}
+    )
+    max_queue_size: int = field(
+        default=1000,
+        metadata={"help": "Maximum dashboard event queue size"}
+    )
+@frozen_dataclass(allow_from_file=True)
 class BenchmarkConfig:
     seed: int = field(
         default=DEFAULT_SEED,

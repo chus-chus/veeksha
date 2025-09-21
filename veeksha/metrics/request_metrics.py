@@ -9,11 +9,11 @@ class RequestMetrics:
     """
     Request-level metrics for 1 request, all metrics are in seconds.
     """
-
     request_dispatched_at: float
     inter_token_times: List[float]
     num_prompt_tokens: int
     num_output_tokens: int
+    request_id: Optional[int] = None
     error_msg: Optional[str] = None
     error_code: Optional[int] = None
 

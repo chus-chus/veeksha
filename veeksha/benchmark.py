@@ -22,8 +22,8 @@ from veeksha.config.utils import prepare_benchmark_output_dir
 from veeksha.core.hf_utils import get_tokenizer
 from veeksha.core.requests_launcher import RequestsLauncher
 from veeksha.core.response import Response
-from veeksha.dashboard.pipeline import emit_dashboard_event
-from veeksha.dashboard.events import RequestStartedEvent, BenchmarkStatusEvent
+from veeksha.dashboard.handler import emit_dashboard_event
+from veeksha.dashboard.events import RequestStartedEvent, BenchmarkStatusEvent, RequestCompletedEvent
 from veeksha.generators.request_generator.base_generator import BaseRequestGenerator
 from veeksha.generators.request_generator.generator_registry import (
     RequestGeneratorRegistry,
@@ -31,6 +31,7 @@ from veeksha.generators.request_generator.generator_registry import (
 from veeksha.logger import init_logger
 from veeksha.metrics.service_metrics import ServiceMetrics
 from veeksha.types import RequestGeneratorType
+from veeksha.dashboard.handler import init_dashboard_event_processor, stop_dashboard_event_processor
 
 logger = init_logger(__name__)
 
@@ -351,6 +352,11 @@ def run_benchmark(
     )
 
     _initialize_min_tokens_support(benchmark_config)
+    init_dashboard_event_processor(
+        enabled=benchmark_config.dashboard_config.enabled,
+        max_queue_size=benchmark_config.dashboard_config.max_queue_size,
+        max_live_requests=benchmark_config.dashboard_config.max_live_requests,
+    )
 
     generated_responses: List[Response] = []
 
@@ -433,15 +439,17 @@ if __name__ == "__main__":
             f"Running {len(benchmark_configs)} benchmark configurations sequentially."
         )
 
-    for i, benchmark_config in enumerate(benchmark_configs):
-        print(f"Running benchmark with config: {benchmark_config}")
-        if len(benchmark_configs) > 1:
-            logger.info(f"Starting benchmark {i+1}/{len(benchmark_configs)}")
+    try:
+        for i, benchmark_config in enumerate(benchmark_configs):
+            print(f"Running benchmark with config: {benchmark_config}")
+            if len(benchmark_configs) > 1:
+                logger.info(f"Starting benchmark {i+1}/{len(benchmark_configs)}")
 
-        random.seed(benchmark_config.seed)
-        service_metrics = run_benchmark(benchmark_config=benchmark_config)
+            random.seed(benchmark_config.seed)
+            service_metrics = run_benchmark(benchmark_config=benchmark_config)
 
-        if len(benchmark_configs) > 1:
-            logger.info(f"Completed benchmark {i+1}/{len(benchmark_configs)}")
-
-    logger.info("All benchmarks completed.")
+            if len(benchmark_configs) > 1:
+                logger.info(f"Completed benchmark {i+1}/{len(benchmark_configs)}")
+    finally:
+        logger.info("All benchmarks completed.")
+        stop_dashboard_event_processor()
