@@ -5,13 +5,13 @@ from veeksha.metrics.request_metrics import RequestMetrics
 
 @dataclass
 class RequestStartedEvent:
-    request_id: str
+    request_id: Union[str, int]
     timestamp: float
     input_tokens: int
 
 @dataclass  
 class TokenBatchEvent:
-    request_id: str
+    request_id: Union[str, int]
     timestamp: float
     tokens_received_this_batch: int
     total_output_tokens: int
@@ -21,7 +21,7 @@ class TokenBatchEvent:
 
 @dataclass
 class RequestCompletedEvent:
-    request_id: str
+    request_id: Union[str, int]
     timestamp: float
     final_metrics: RequestMetrics
 
@@ -45,7 +45,7 @@ class BenchmarkStatusEvent:
 
 @dataclass
 class RequestErrorEvent:
-    request_id: str
+    request_id: Union[str, int]
     timestamp: float
     error_code: Optional[int]
     error_msg: str

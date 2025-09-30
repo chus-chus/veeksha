@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Deque
+from typing import Dict, List, Optional, Deque, Union
 from collections import deque
 import time
 import threading
@@ -10,7 +10,7 @@ from veeksha.metrics.request_metrics import RequestMetrics
 
 @dataclass
 class LiveRequestInfo:
-    request_id: str
+    request_id: Union[str, int]  # Can be string or int depending on source
     start_timestamp: float
     input_tokens: int
     current_output_tokens: int = 0
@@ -58,6 +58,7 @@ class DashboardState:
         
         # State tracking:
         self.live_requests: Dict[str, LiveRequestInfo] = {}
+        self.completed_requests: Dict[str, LiveRequestInfo] = {}
         self.aggregate_stats = AggregateStats()
         self.capacity_search = CapacitySearchState()
         self.benchmark_start_time: Optional[float] = None
@@ -110,8 +111,22 @@ class DashboardState:
             # TODO: how to calculate progress?
     
     def _handle_request_completed(self, event: RequestCompletedEvent) -> None:
-        # Remove from live requests + update aggregate stats
+        # Move from live requests to completed requests + update aggregate stats
         if event.request_id in self.live_requests:
+            # Move to completed requests with final state
+            completed_req = self.live_requests[event.request_id]
+            completed_req.progress_pct = 100.0  # Mark as fully completed
+            completed_req.is_waiting_first_token = False
+            
+            # Update with final metrics
+            metrics = event.final_metrics
+            if metrics.ttft > 0:
+                completed_req.ttft_ms = metrics.ttft * 1000
+            if metrics.tpot > 0:
+                completed_req.current_tpot_ms = metrics.tpot * 1000
+            
+            # Move to completed collection
+            self.completed_requests[event.request_id] = completed_req
             del self.live_requests[event.request_id]
         
         self.aggregate_stats.completed_count += 1
@@ -149,6 +164,19 @@ class DashboardState:
     def get_live_requests(self) -> List[LiveRequestInfo]:
         with self._lock:
             return list(self.live_requests.values())
+    
+    def get_all_requests(self) -> List[LiveRequestInfo]:
+        """Get list of all requests (live + completed)"""
+        with self._lock:
+            all_requests = []
+            all_requests.extend(self.live_requests.values())
+            all_requests.extend(self.completed_requests.values())
+            return all_requests
+    
+    def get_completed_requests(self) -> List[LiveRequestInfo]:
+        """Get list of completed requests"""
+        with self._lock:
+            return list(self.completed_requests.values())
     
     def get_aggregate_stats(self) -> AggregateStats:
         with self._lock:

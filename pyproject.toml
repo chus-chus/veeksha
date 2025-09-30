@@ -33,7 +33,9 @@ dependencies = [
     "evaluate",
     "pytablewriter",
     "Pillow",
-    "rekha"
+    "rekha",
+    "textual",
+    "plotext"
 ]
 
 [project.urls]

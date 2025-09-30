@@ -352,8 +352,12 @@ def run_benchmark(
     )
 
     _initialize_min_tokens_support(benchmark_config)
+    # Check if we should enable console dashboard (for multi-config runs)
+    enable_console = getattr(benchmark_config, "_enable_console_dashboard", False)
+    
     init_dashboard_event_processor(
         enabled=benchmark_config.dashboard_config.enabled,
+        enable_frontend=enable_console,  # Enable console for multi-config runs
         max_queue_size=benchmark_config.dashboard_config.max_queue_size,
         max_live_requests=benchmark_config.dashboard_config.max_live_requests,
     )
@@ -428,6 +432,30 @@ def run_benchmark(
     return service_metrics
 
 
+def run_benchmark_with_dashboard(benchmark_config: BenchmarkConfig):
+    """Run benchmark with interactive dashboard in main thread"""
+    from veeksha.dashboard.frontend import run_dashboard_with_benchmark
+    
+    logger.info("Starting interactive dashboard with benchmark")
+    run_dashboard_with_benchmark(benchmark_config)
+
+
+def run_benchmark_console_only(benchmark_config: BenchmarkConfig):
+    """Run benchmark with console-only output"""
+    try:
+        random.seed(benchmark_config.seed)
+        # Temporarily enable console frontend for this run
+        original_enabled = benchmark_config.dashboard_config.enabled
+        if original_enabled:
+            # Override the init call in run_benchmark to enable console frontend
+            object.__setattr__(benchmark_config, "_enable_console_dashboard", True)
+        
+        service_metrics = run_benchmark(benchmark_config=benchmark_config)
+        return service_metrics
+    finally:
+        stop_dashboard_event_processor()
+
+
 if __name__ == "__main__":
     if platform.system() == "Darwin":
         multiprocessing.set_start_method("fork", force=True)
@@ -438,6 +466,7 @@ if __name__ == "__main__":
         logger.info(
             f"Running {len(benchmark_configs)} benchmark configurations sequentially."
         )
+        logger.info("Using console dashboard for multiple configurations.")
 
     try:
         for i, benchmark_config in enumerate(benchmark_configs):
@@ -445,11 +474,16 @@ if __name__ == "__main__":
             if len(benchmark_configs) > 1:
                 logger.info(f"Starting benchmark {i+1}/{len(benchmark_configs)}")
 
-            random.seed(benchmark_config.seed)
-            service_metrics = run_benchmark(benchmark_config=benchmark_config)
+            # Check if we should launch interactive dashboard
+            if (benchmark_config.dashboard_config.enabled and 
+                len(benchmark_configs) == 1):
+                # Single benchmark with dashboard - launch interactive TUI
+                run_benchmark_with_dashboard(benchmark_config)
+            else:
+                # Multiple benchmarks or dashboard disabled - console only
+                run_benchmark_console_only(benchmark_config)
 
             if len(benchmark_configs) > 1:
                 logger.info(f"Completed benchmark {i+1}/{len(benchmark_configs)}")
     finally:
         logger.info("All benchmarks completed.")
-        stop_dashboard_event_processor()

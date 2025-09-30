@@ -126,6 +126,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                 response.raise_for_status()
 
                 async for data in self._process_stream(response):
+                    tokens_received_chunk = 0  # Track tokens received in this chunk
                     if "error" in data:
                         err = data.get("error") or {}
                         error_msg = err.get("message", "Unknown error")
@@ -157,6 +158,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                             )
 
                         if allowable_to_add > 0:
+                            tokens_received_chunk += allowable_to_add  # Track tokens for this chunk
                             inter_token_times.append(
                                 time.monotonic() - most_recent_received_token_time
                             )
