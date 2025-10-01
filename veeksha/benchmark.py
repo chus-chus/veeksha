@@ -470,8 +470,14 @@ def run_benchmark_with_dashboard(benchmark_config: BenchmarkConfig):
     return service_metrics
 
 
-def run_benchmark_console_only(benchmark_config: BenchmarkConfig):
-    """Run benchmark with console-only output"""
+def run_benchmark_console_only(benchmark_config: BenchmarkConfig, stop_processor_after: bool = True):
+    """Run benchmark with console-only output
+
+    Args:
+        benchmark_config: Configuration for the benchmark
+        stop_processor_after: If True, stop the dashboard processor after this benchmark.
+                            Set to False when running multiple benchmarks sequentially.
+    """
     try:
         random.seed(benchmark_config.seed)
         # Temporarily enable console frontend for this run
@@ -479,11 +485,12 @@ def run_benchmark_console_only(benchmark_config: BenchmarkConfig):
         if original_enabled:
             # Override the init call in run_benchmark to enable console frontend
             object.__setattr__(benchmark_config, "_enable_console_dashboard", True)
-        
+
         service_metrics = run_benchmark(benchmark_config=benchmark_config)
         return service_metrics
     finally:
-        stop_dashboard_event_processor()
+        if stop_processor_after:
+            stop_dashboard_event_processor()
 
 
 if __name__ == "__main__":
@@ -499,21 +506,38 @@ if __name__ == "__main__":
         logger.info("Using console dashboard for multiple configurations.")
 
     try:
+        has_dashboard_enabled = any(bc.dashboard_config.enabled for bc in benchmark_configs)
+
         for i, benchmark_config in enumerate(benchmark_configs):
             print(f"Running benchmark with config: {benchmark_config}")
             if len(benchmark_configs) > 1:
                 logger.info(f"Starting benchmark {i+1}/{len(benchmark_configs)}")
 
             # Check if we should launch interactive dashboard
-            if (benchmark_config.dashboard_config.enabled and 
+            if (benchmark_config.dashboard_config.enabled and
                 len(benchmark_configs) == 1):
                 # Single benchmark with dashboard - launch interactive TUI
                 run_benchmark_with_dashboard(benchmark_config)
             else:
                 # Multiple benchmarks or dashboard disabled - console only
-                run_benchmark_console_only(benchmark_config)
+                # Only stop processor after the last benchmark
+                is_last = (i == len(benchmark_configs) - 1)
+                run_benchmark_console_only(benchmark_config, stop_processor_after=is_last)
 
             if len(benchmark_configs) > 1:
                 logger.info(f"Completed benchmark {i+1}/{len(benchmark_configs)}")
+
+        # If multiple benchmarks with dashboard enabled, keep it open for viewing
+        if len(benchmark_configs) > 1 and has_dashboard_enabled:
+            logger.info("All benchmarks complete. Flask dashboard still running at http://localhost:5000")
+            logger.info("Press Ctrl+C to exit")
+            try:
+                import time
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                logger.info("Dashboard stopped")
     finally:
         logger.info("All benchmarks completed.")
+        # Ensure processor is stopped even if there's an exception
+        stop_dashboard_event_processor()
