@@ -8,8 +8,9 @@ class RequestStartedEvent:
     request_id: Union[str, int]
     timestamp: float
     input_tokens: int
+    benchmark_id: str = "default"
 
-@dataclass  
+@dataclass
 class TokenBatchEvent:
     request_id: Union[str, int]
     timestamp: float
@@ -18,12 +19,15 @@ class TokenBatchEvent:
     ttft_ms: Optional[float] = None
     current_tpot_ms: Optional[float] = None
     is_first_token: bool = False
+    recent_tbt_ms: Optional[List[float]] = None  # Recent TBT values in this batch
+    benchmark_id: str = "default"
 
 @dataclass
 class RequestCompletedEvent:
     request_id: Union[str, int]
     timestamp: float
     final_metrics: RequestMetrics
+    benchmark_id: str = "default"
 
 @dataclass
 class CapacitySearchEvent:
@@ -42,6 +46,7 @@ class BenchmarkStatusEvent:
     active_requests: int
     current_qps: float
     elapsed_time: float
+    benchmark_id: str = "default"
 
 @dataclass
 class RequestErrorEvent:
@@ -49,6 +54,7 @@ class RequestErrorEvent:
     timestamp: float
     error_code: Optional[int]
     error_msg: str
+    benchmark_id: str = "default"
 
 DashboardEvent = Union[
     RequestStartedEvent, 

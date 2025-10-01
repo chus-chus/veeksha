@@ -22,6 +22,7 @@ class RequestConfig(BaseModel):
     llm_api: Optional[str] = None
     address_append_value: Optional[str] = None
     id: Optional[int] = None
+    benchmark_id: str = "default"
 
     def __str__(self) -> str:
         return f"RequestConfig(id={self.id})"

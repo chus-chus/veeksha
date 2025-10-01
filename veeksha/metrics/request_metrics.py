@@ -16,6 +16,7 @@ class RequestMetrics:
     request_id: Optional[int] = None
     error_msg: Optional[str] = None
     error_code: Optional[int] = None
+    benchmark_id: str = "default"
 
     @cached_property
     def num_total_tokens(self):

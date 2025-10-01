@@ -187,9 +187,12 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                     if tokens_received_chunk > 0 and (tokens_received - last_token_batch_emission) >= 10: # TODO: make this configurable/a constant
                         current_ttft_ms = inter_token_times[0] * 1000 if inter_token_times else None
                         current_tpot_ms = None
+                        recent_tbt_ms = None
                         if len(inter_token_times) > 1:
                             from statistics import mean
                             current_tpot_ms = mean(inter_token_times[1:]) * 1000
+                            # Get recent TBT values (last 10 or all available)
+                            recent_tbt_ms = [t * 1000 for t in inter_token_times[1:][-10:]]
 
                         emit_dashboard_event(TokenBatchEvent(
                             request_id=request_config.id,
@@ -198,7 +201,9 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                             total_output_tokens=tokens_received,
                             ttft_ms=current_ttft_ms,
                             current_tpot_ms=current_tpot_ms,
-                            is_first_token=(len(inter_token_times) == 1)
+                            is_first_token=(len(inter_token_times) == 1),
+                            recent_tbt_ms=recent_tbt_ms,
+                            benchmark_id=request_config.benchmark_id
                         ))
                         last_token_batch_emission = tokens_received
 
@@ -231,6 +236,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
             num_output_tokens=tokens_received,
             error_code=error_response_code,
             error_msg=error_msg,
+            benchmark_id=request_config.benchmark_id,
         )
 
         generated_response: Optional[Response]

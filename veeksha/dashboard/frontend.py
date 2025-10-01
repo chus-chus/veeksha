@@ -191,6 +191,53 @@ class TPOTGraph(LiveGraph):
         self.update(plot_str)
 
 
+class TBTGraph(LiveGraph):
+    """Graph for Time Between Tokens metrics"""
+
+    def __init__(self, **kwargs):
+        super().__init__("⏱️ TBT Over Time", **kwargs)
+
+    def update_plot(self):
+        """Create a clean plotext graph for TBT"""
+        if not PLOTEXT_AVAILABLE:
+            self.update("⏱️ [bold yellow]Time Between Tokens[/bold yellow]\n\n[dim]Install plotext: pip install plotext[/dim]")
+            return
+
+        if len(self.data_points) < 1:
+            self.update("⏱️ [bold yellow]Time Between Tokens[/bold yellow]\n\n[dim]Waiting for data...[/dim]")
+            return
+
+        # Get recent data for display
+        recent_points = list(self.data_points)[-30:]
+        recent_times = list(self.timestamps)[-30:]
+
+        if not recent_points:
+            self.update("⏱️ [bold yellow]Time Between Tokens[/bold yellow]\n\n[dim]No data available[/dim]")
+            return
+
+        # Calculate stats
+        status = "🔵 FINAL" if self.is_frozen else "🟢 LIVE"
+        min_val, max_val = min(recent_points), max(recent_points)
+        avg_val = sum(recent_points) / len(recent_points)
+        latest_val = recent_points[-1]
+        perf_indicator = "🟢 Fast" if avg_val < 10 else "🟡 OK" if avg_val < 50 else "🔴 Slow"
+
+        # Create plot with dark theme
+        plt.clear_data()
+        plt.clear_figure()
+        plt.theme("dark")
+
+        plt.plot(recent_times, recent_points, marker="dot")
+        plt.plotsize(78, 13)
+        plt.title(f"TBT - {status} | Latest: {latest_val:.1f}ms, Avg: {avg_val:.1f}ms {perf_indicator}")
+        plt.xlabel("Time (seconds)")
+        plt.ylabel("TBT (ms)")
+        plt.grid(True)
+
+        plot_str = plt.build()
+        self.update(plot_str)
+
+
 class ThroughputGraph(LiveGraph):
     """Graph for throughput metrics"""
     
@@ -371,10 +418,12 @@ class VeekshaDashboard(App):
     
     TITLE = "🚀 Veeksha LLM Benchmark Analytics Dashboard"
     SUB_TITLE = "Live Performance Metrics & Analysis"
-    
+
     BINDINGS = [
         ("p", "pause", "Pause"),
-        ("r", "resume", "Resume"), 
+        ("r", "resume", "Resume"),
+        ("n", "next_benchmark", "Next"),
+        ("b", "prev_benchmark", "Prev"),
         ("s", "save_analysis", "Save"),
         ("q", "quit", "Quit"),
         ("ctrl+c", "quit", "Quit"),
@@ -391,7 +440,7 @@ class VeekshaDashboard(App):
         # Graph widgets
         self.ttft_graph = None
         self.tpot_graph = None
-        self.throughput_graph = None
+        self.tbt_graph = None
         self.latency_graph = None
         
     def compose(self) -> ComposeResult:
@@ -414,8 +463,8 @@ class VeekshaDashboard(App):
                         self.tpot_graph = TPOTGraph(classes="graph-widget")
                         yield self.tpot_graph
                     with Horizontal():
-                        self.throughput_graph = ThroughputGraph(classes="graph-widget")
-                        yield self.throughput_graph
+                        self.tbt_graph = TBTGraph(classes="graph-widget")
+                        yield self.tbt_graph
                         self.latency_graph = LatencyOverTime(classes="graph-widget")
                         yield self.latency_graph
             
@@ -429,7 +478,17 @@ class VeekshaDashboard(App):
         """Called when app starts."""
         # Start the update timer to refresh data every 500ms
         self.update_timer = self.set_interval(0.5, self.update_dashboard)
-        self.notify("📊 Analytics Dashboard started! 'p'=pause, 'r'=resume, 's'=save, 'q'=quit", timeout=5)
+        self.update_subtitle()
+        self.notify("📊 Analytics Dashboard started! 'p'=pause, 'r'=resume, 'n/b'=switch benchmark, 'q'=quit", timeout=5)
+
+    def update_subtitle(self) -> None:
+        """Update subtitle with current benchmark info"""
+        benchmark_ids = self.dashboard_state.get_benchmark_ids()
+        active_id = self.dashboard_state.active_benchmark_id
+        if len(benchmark_ids) > 1:
+            self.sub_title = f"Live Metrics | Benchmark: {active_id} ({benchmark_ids.index(active_id) + 1}/{len(benchmark_ids)})"
+        else:
+            self.sub_title = f"Live Metrics | Benchmark: {active_id}"
     
     def action_pause(self) -> None:
         """Pause the dashboard updates"""
@@ -449,13 +508,39 @@ class VeekshaDashboard(App):
         self.add_class("running")
         self.remove_class("paused")
     
+    def action_next_benchmark(self) -> None:
+        """Switch to next benchmark"""
+        benchmark_ids = self.dashboard_state.get_benchmark_ids()
+        if len(benchmark_ids) <= 1:
+            self.notify("⚠️ Only one benchmark available", severity="warning")
+            return
+
+        current_idx = benchmark_ids.index(self.dashboard_state.active_benchmark_id)
+        next_idx = (current_idx + 1) % len(benchmark_ids)
+        self.dashboard_state.set_active_benchmark(benchmark_ids[next_idx])
+        self.update_subtitle()
+        self.notify(f"📊 Switched to benchmark: {benchmark_ids[next_idx]}", severity="information")
+
+    def action_prev_benchmark(self) -> None:
+        """Switch to previous benchmark"""
+        benchmark_ids = self.dashboard_state.get_benchmark_ids()
+        if len(benchmark_ids) <= 1:
+            self.notify("⚠️ Only one benchmark available", severity="warning")
+            return
+
+        current_idx = benchmark_ids.index(self.dashboard_state.active_benchmark_id)
+        prev_idx = (current_idx - 1) % len(benchmark_ids)
+        self.dashboard_state.set_active_benchmark(benchmark_ids[prev_idx])
+        self.update_subtitle()
+        self.notify(f"📊 Switched to benchmark: {benchmark_ids[prev_idx]}", severity="information")
+
     def action_save_analysis(self) -> None:
         """Save analysis data"""
         if self.benchmark_completed:
             self.notify("💾 Analysis saved to benchmark results directory", severity="information")
         else:
             self.notify("⚠️ Benchmark still running - analysis will be available after completion", severity="warning")
-    
+
     def action_quit(self) -> None:
         """Quit the dashboard"""
         if self.benchmark_completed or self.analysis_mode:
@@ -468,6 +553,7 @@ class VeekshaDashboard(App):
     def update_dashboard(self) -> None:
         """Update all dashboard components with latest data"""
         if not self.is_paused:
+            self.update_subtitle()
             self.update_benchmark_status()
             self.update_metrics_display()
             self.update_live_requests()
@@ -496,15 +582,15 @@ class VeekshaDashboard(App):
         if self.ttft_graph:
             self.ttft_graph.freeze_at_completion()
         if self.tpot_graph:
-            self.tpot_graph.freeze_at_completion() 
-        if self.throughput_graph:
-            self.throughput_graph.freeze_at_completion()
+            self.tpot_graph.freeze_at_completion()
+        if self.tbt_graph:
+            self.tbt_graph.freeze_at_completion()
         if self.latency_graph:
             self.latency_graph.freeze_at_completion()
     
     def update_graphs(self) -> None:
         """Update all graph widgets with latest data"""
-        if not (self.ttft_graph and self.tpot_graph and self.throughput_graph and self.latency_graph):
+        if not (self.ttft_graph and self.tpot_graph and self.tbt_graph and self.latency_graph):
             return
         
         # Stop updating graphs if benchmark is completed
@@ -535,14 +621,17 @@ class VeekshaDashboard(App):
                     self.tpot_graph.add_data_point(tpot)
                 self.tpot_graph._last_count = len(aggregate_stats.recent_tpot_ms)
                 self.tpot_graph.update_plot()
-        
-        # Update throughput graph - calculate QPS from completed requests
-        duration = self.dashboard_state.get_benchmark_duration()
-        if duration > 0:
-            # Calculate effective QPS from completed requests
-            effective_qps = aggregate_stats.completed_count / duration
-            self.throughput_graph.add_qps_point(effective_qps)
-            self.throughput_graph.update_plot()
+
+        # Update TBT graph - add new data points as they come
+        if aggregate_stats.recent_tbt_ms:
+            last_count = getattr(self.tbt_graph, '_last_count', 0)
+            if len(aggregate_stats.recent_tbt_ms) > last_count:
+                # Convert deque to list for slicing
+                tbt_list = list(aggregate_stats.recent_tbt_ms)
+                for tbt in tbt_list[last_count:]:
+                    self.tbt_graph.add_data_point(tbt)
+                self.tbt_graph._last_count = len(aggregate_stats.recent_tbt_ms)
+                self.tbt_graph.update_plot()
         
         # Update latency graph - add new data points as they come
         if aggregate_stats.recent_latency_ms:
