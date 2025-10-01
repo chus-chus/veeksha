@@ -254,6 +254,11 @@ def create_flask_app(dashboard_state: DashboardState) -> Flask:
         state.set_active_benchmark(benchmark_id)
         return index()  # Render with new benchmark
 
+    @app.route('/health')
+    def health():
+        """Health check endpoint."""
+        return jsonify({'status': 'ok', 'message': 'Veeksha dashboard is running'})
+
     return app
 
 
@@ -306,9 +311,23 @@ def run_dashboard_flask(
     print("="*70 + "\n")
 
     def run_app():
-        app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)
+        try:
+            # Disable Flask's startup messages in production
+            import logging
+            log = logging.getLogger('werkzeug')
+            log.setLevel(logging.ERROR)
+
+            app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)
+        except Exception as e:
+            print(f"❌ Failed to start Flask server: {e}")
+            import traceback
+            traceback.print_exc()
 
     thread = threading.Thread(target=run_app, daemon=True)
     thread.start()
+
+    # Give Flask a moment to start
+    import time
+    time.sleep(0.5)
 
     return thread

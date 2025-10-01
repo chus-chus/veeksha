@@ -446,11 +446,28 @@ def run_benchmark(
 
 
 def run_benchmark_with_dashboard(benchmark_config: BenchmarkConfig):
-    """Run benchmark with interactive dashboard in main thread"""
-    from veeksha.dashboard.frontend import run_dashboard_with_benchmark
-    
-    logger.info("Starting interactive dashboard with benchmark")
-    run_dashboard_with_benchmark(benchmark_config)
+    """Run benchmark with Flask web dashboard"""
+    logger.info("Starting Flask web dashboard with benchmark")
+
+    # Enable Flask frontend for this run
+    benchmark_config._enable_console_dashboard = True
+
+    # Run the benchmark - Flask dashboard starts automatically
+    # via init_dashboard_event_processor in run_benchmark()
+    service_metrics = run_benchmark(benchmark_config)
+
+    # Keep the process alive to maintain Flask server
+    logger.info("Benchmark complete. Flask dashboard still running at http://localhost:5000")
+    logger.info("Press Ctrl+C to exit")
+
+    try:
+        import time
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Dashboard stopped")
+
+    return service_metrics
 
 
 def run_benchmark_console_only(benchmark_config: BenchmarkConfig):
