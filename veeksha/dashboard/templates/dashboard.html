@@ -130,24 +130,25 @@
             gap: 8px;
         }
 
-        .live-requests {
+        .requests-section {
             background: rgba(255, 255, 255, 0.05);
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            margin-bottom: 25px;
         }
 
-        .live-requests h2 {
+        .requests-section h2 {
             margin-bottom: 15px;
             font-size: 1.3em;
         }
 
-        .live-requests table {
+        .requests-section table {
             width: 100%;
             border-collapse: collapse;
         }
 
-        .live-requests th {
+        .requests-section th {
             background: rgba(102, 126, 234, 0.2);
             padding: 12px;
             text-align: left;
@@ -155,12 +156,12 @@
             border-bottom: 2px solid rgba(102, 126, 234, 0.4);
         }
 
-        .live-requests td {
+        .requests-section td {
             padding: 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .live-requests tr:hover {
+        .requests-section tr:hover {
             background: rgba(255, 255, 255, 0.05);
         }
 
@@ -202,7 +203,7 @@
 
         <div class="benchmark-selector">
             <label>📊 Benchmark:</label>
-            <select onchange="window.location.href='/benchmark/'+this.value">
+            <select id="benchmark-selector" onchange="switchBenchmark(this.value)">
                 {% if not benchmarks %}
                     <option value="">No benchmarks available</option>
                 {% else %}
@@ -217,38 +218,38 @@
             <span>Live</span>
         </div>
 
-        <div class="stats-grid">
+        <div class="stats-grid" id="stats-grid">
             <div class="stat-card primary">
                 <h3>Total Requests</h3>
-                <div class="value">{{ stats.get('total_requests', 0) }}</div>
+                <div class="value" id="stat-total">{{ stats.get('total_requests', 0) }}</div>
             </div>
             <div class="stat-card success">
                 <h3>Completed</h3>
-                <div class="value">{{ stats.get('completed_count', 0) }}</div>
+                <div class="value" id="stat-completed">{{ stats.get('completed_count', 0) }}</div>
             </div>
             <div class="stat-card danger">
                 <h3>Errors</h3>
-                <div class="value">{{ stats.get('error_count', 0) }}</div>
+                <div class="value" id="stat-errors">{{ stats.get('error_count', 0) }}</div>
             </div>
             <div class="stat-card warning">
                 <h3>Duration</h3>
-                <div class="value">{{ "%.1f"|format(stats.get('duration', 0)) }}s</div>
+                <div class="value" id="stat-duration">{{ "%.1f"|format(stats.get('duration', 0)) }}s</div>
             </div>
             <div class="stat-card primary">
                 <h3>Avg TTFT</h3>
-                <div class="value">{{ "%.1f"|format(stats.get('avg_ttft_ms', 0)) }}ms</div>
+                <div class="value" id="stat-ttft">{{ "%.1f"|format(stats.get('avg_ttft_ms', 0)) }}ms</div>
             </div>
             <div class="stat-card success">
                 <h3>Avg TPOT</h3>
-                <div class="value">{{ "%.1f"|format(stats.get('avg_tpot_ms', 0)) }}ms</div>
+                <div class="value" id="stat-tpot">{{ "%.1f"|format(stats.get('avg_tpot_ms', 0)) }}ms</div>
             </div>
             <div class="stat-card warning">
                 <h3>Avg TBT</h3>
-                <div class="value">{{ "%.1f"|format(stats.get('avg_tbt_ms', 0)) }}ms</div>
+                <div class="value" id="stat-tbt">{{ "%.1f"|format(stats.get('avg_tbt_ms', 0)) }}ms</div>
             </div>
             <div class="stat-card danger">
                 <h3>Avg Latency</h3>
-                <div class="value">{{ "%.0f"|format(stats.get('avg_latency_ms', 0)) }}ms</div>
+                <div class="value" id="stat-latency">{{ "%.0f"|format(stats.get('avg_latency_ms', 0)) }}ms</div>
             </div>
         </div>
 
@@ -271,7 +272,7 @@
             </div>
         </div>
 
-        <div class="live-requests">
+        <div class="requests-section">
             <h2>🔴 Live Requests</h2>
             <table>
                 <thead>
@@ -284,23 +285,30 @@
                         <th>Progress</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% if not live_requests %}
-                        <tr>
-                            <td colspan="6" style="text-align: center; opacity: 0.5;">No active requests</td>
-                        </tr>
-                    {% else %}
-                        {% for req in live_requests %}
-                            <tr>
-                                <td>{{ req.request_id }}</td>
-                                <td>{{ req.input_tokens }}</td>
-                                <td>{{ req.output_tokens }}</td>
-                                <td>{{ "%.1f"|format(req.ttft_ms) if req.ttft_ms else '-' }}</td>
-                                <td>{{ "%.1f"|format(req.tpot_ms) if req.tpot_ms else '-' }}</td>
-                                <td>{{ "%.0f%%"|format(req.progress_pct) if req.progress_pct else '-' }}</td>
-                            </tr>
-                        {% endfor %}
-                    {% endif %}
+                <tbody id="live-requests-tbody">
+                    <tr>
+                        <td colspan="6" style="text-align: center; opacity: 0.5;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="requests-section">
+            <h2>✅ Completed Requests (Last 20)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Request ID</th>
+                        <th>Input Tokens</th>
+                        <th>Output Tokens</th>
+                        <th>TTFT (ms)</th>
+                        <th>TPOT (ms)</th>
+                    </tr>
+                </thead>
+                <tbody id="completed-requests-tbody">
+                    <tr>
+                        <td colspan="5" style="text-align: center; opacity: 0.5;">Loading...</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -311,16 +319,90 @@
     </div>
 
     <script>
-        // Auto-refresh page every 1 second for live updates
-        setTimeout(() => location.reload(), 1000);
+        let currentBenchmarkId = '{{ active_benchmark }}';
 
-        // Prevent scroll position reset on refresh
-        if (window.performance && performance.navigation.type === 1) {
-            window.scrollTo(0, sessionStorage.getItem('scrollPos') || 0);
+        function switchBenchmark(benchmarkId) {
+            currentBenchmarkId = benchmarkId;
+            // Set active on backend
+            fetch(`/api/set_active/${benchmarkId}`)
+                .then(() => {
+                    // Reload page to get new initial data
+                    location.reload();
+                });
         }
-        window.addEventListener('beforeunload', () => {
-            sessionStorage.setItem('scrollPos', window.scrollY);
-        });
+
+        function updateStats() {
+            fetch(`/api/benchmark/${currentBenchmarkId}/stats`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('stat-total').textContent = data.total_requests;
+                    document.getElementById('stat-completed').textContent = data.completed_count;
+                    document.getElementById('stat-errors').textContent = data.error_count;
+                    document.getElementById('stat-duration').textContent = data.duration.toFixed(1) + 's';
+                    document.getElementById('stat-ttft').textContent = data.avg_ttft_ms.toFixed(1) + 'ms';
+                    document.getElementById('stat-tpot').textContent = data.avg_tpot_ms.toFixed(1) + 'ms';
+                    document.getElementById('stat-tbt').textContent = data.avg_tbt_ms.toFixed(1) + 'ms';
+                    document.getElementById('stat-latency').textContent = data.avg_latency_ms.toFixed(0) + 'ms';
+                })
+                .catch(err => console.error('Failed to update stats:', err));
+        }
+
+        function updateLiveRequests() {
+            fetch(`/api/benchmark/${currentBenchmarkId}/live_requests`)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('live-requests-tbody');
+                    if (data.requests.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; opacity: 0.5;">No active requests</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.requests.map(req => `
+                            <tr>
+                                <td>${req.request_id}</td>
+                                <td>${req.input_tokens}</td>
+                                <td>${req.output_tokens}</td>
+                                <td>${req.ttft_ms ? req.ttft_ms.toFixed(1) : '-'}</td>
+                                <td>${req.tpot_ms ? req.tpot_ms.toFixed(1) : '-'}</td>
+                                <td>${req.progress_pct ? req.progress_pct.toFixed(0) + '%' : '-'}</td>
+                            </tr>
+                        `).join('');
+                    }
+                })
+                .catch(err => console.error('Failed to update live requests:', err));
+        }
+
+        function updateCompletedRequests() {
+            fetch(`/api/benchmark/${currentBenchmarkId}/completed_requests`)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('completed-requests-tbody');
+                    if (data.requests.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; opacity: 0.5;">No completed requests yet</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.requests.map(req => `
+                            <tr>
+                                <td>${req.request_id}</td>
+                                <td>${req.input_tokens}</td>
+                                <td>${req.output_tokens}</td>
+                                <td>${req.ttft_ms ? req.ttft_ms.toFixed(1) : '-'}</td>
+                                <td>${req.tpot_ms ? req.tpot_ms.toFixed(1) : '-'}</td>
+                            </tr>
+                        `).join('');
+                    }
+                })
+                .catch(err => console.error('Failed to update completed requests:', err));
+        }
+
+        function updateAll() {
+            updateStats();
+            updateLiveRequests();
+            updateCompletedRequests();
+        }
+
+        // Initial update
+        updateAll();
+
+        // Update every 1 second
+        setInterval(updateAll, 1000);
     </script>
 </body>
 </html>

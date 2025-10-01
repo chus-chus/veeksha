@@ -203,6 +203,25 @@ def create_flask_app(dashboard_state: DashboardState) -> Flask:
 
         return jsonify({'requests': requests_data})
 
+    @app.route('/api/benchmark/<benchmark_id>/completed_requests')
+    def get_completed_requests(benchmark_id: str):
+        """Get completed requests."""
+        state = app.config['dashboard_state']
+        completed_requests = state.get_completed_requests(benchmark_id)
+
+        # Convert to serializable format - show last 20 completed
+        requests_data = []
+        for req in list(completed_requests)[-20:]:
+            requests_data.append({
+                'request_id': req.request_id,
+                'input_tokens': req.input_tokens,
+                'output_tokens': req.current_output_tokens,
+                'ttft_ms': req.ttft_ms,
+                'tpot_ms': req.current_tpot_ms
+            })
+
+        return jsonify({'requests': requests_data})
+
     @app.route('/api/stream')
     def stream():
         """Server-Sent Events stream for real-time updates."""

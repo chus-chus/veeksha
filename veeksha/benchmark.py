@@ -449,8 +449,8 @@ def run_benchmark_with_dashboard(benchmark_config: BenchmarkConfig):
     """Run benchmark with Flask web dashboard"""
     logger.info("Starting Flask web dashboard with benchmark")
 
-    # Enable Flask frontend for this run
-    benchmark_config._enable_console_dashboard = True
+    # Enable Flask frontend for this run (using object.__setattr__ for frozen dataclass)
+    object.__setattr__(benchmark_config, "_enable_console_dashboard", True)
 
     # Run the benchmark - Flask dashboard starts automatically
     # via init_dashboard_event_processor in run_benchmark()
