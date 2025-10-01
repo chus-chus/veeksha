@@ -159,6 +159,7 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
             max_tokens_limit = request_config.sampling_params.get("max_tokens")
 
         last_token_batch_emission = 0
+        is_first_emission = True  # Track if this is the first dashboard event emission
 
         try:
             async with session.post(address, json=body, headers=headers) as response:
@@ -176,6 +177,7 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
                         non_stream_logprobs = lp
                 else:
                     async for data in self._process_stream(response):
+                        tokens_received_chunk = 0  # Track tokens received in this chunk
                         if "error" in data:
                             err = data.get("error") or {}
                             error_msg = err.get("message", "Unknown error")
@@ -204,6 +206,7 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
                                     ),
                                 )
                             if allowable_to_add > 0:
+                                tokens_received_chunk += allowable_to_add  # Track tokens for this chunk
                                 inter_token_times.append(
                                     time.monotonic() - most_recent_received_token_time
                                 )
@@ -230,37 +233,40 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
                                 and tokens_received >= max_tokens_limit
                             ):
                                 break
-                            if "logprobs" in data["choices"][0]:
-                                raw_lp = data["choices"][0]["logprobs"]
-                                if isinstance(raw_lp, list):
-                                    logprobs_chunks = [
-                                        lp for lp in raw_lp if isinstance(lp, dict)
-                                    ]
-                                elif isinstance(raw_lp, dict):
-                                    logprobs_chunks.append(raw_lp)
 
-                    if tokens_received_chunk > 0 and (tokens_received - last_token_batch_emission) >= 10: # TODO: make this configurable/a constant
-                        current_ttft_ms = inter_token_times[0] * 1000 if inter_token_times else None
-                        current_tpot_ms = None
-                        recent_tbt_ms = None
-                        if len(inter_token_times) > 1:
-                            from statistics import mean
-                            current_tpot_ms = mean(inter_token_times[1:]) * 1000
-                            # Get recent TBT values (last 10 or all available)
-                            recent_tbt_ms = [t * 1000 for t in inter_token_times[1:][-10:]]
+                        # Emit dashboard event every 10 tokens
+                        if tokens_received_chunk > 0 and (tokens_received - last_token_batch_emission) >= 10:
+                            current_ttft_ms = inter_token_times[0] * 1000 if inter_token_times else None
+                            current_tpot_ms = None
+                            recent_tbt_ms = None
+                            if len(inter_token_times) > 1:
+                                from statistics import mean
+                                current_tpot_ms = mean(inter_token_times[1:]) * 1000
+                                # Get recent TBT values (last 10 or all available)
+                                recent_tbt_ms = [t * 1000 for t in inter_token_times[1:][-10:]]
 
-                        emit_dashboard_event(TokenBatchEvent(
-                            request_id=request_config.id,
-                            timestamp=time.time(),
-                            tokens_received_this_batch=tokens_received_chunk,
-                            total_output_tokens=tokens_received,
-                            ttft_ms=current_ttft_ms,
-                            current_tpot_ms=current_tpot_ms,
-                            is_first_token=(len(inter_token_times) == 1),
-                            recent_tbt_ms=recent_tbt_ms,
-                            benchmark_id=request_config.benchmark_id
-                        ))
-                        last_token_batch_emission = tokens_received
+                            emit_dashboard_event(TokenBatchEvent(
+                                request_id=request_config.id,
+                                timestamp=time.time(),
+                                tokens_received_this_batch=tokens_received_chunk,
+                                total_output_tokens=tokens_received,
+                                ttft_ms=current_ttft_ms,
+                                current_tpot_ms=current_tpot_ms,
+                                is_first_token=is_first_emission,
+                                recent_tbt_ms=recent_tbt_ms,
+                                benchmark_id=request_config.benchmark_id
+                            ))
+                            last_token_batch_emission = tokens_received
+                            is_first_emission = False  # After first emission, no longer first
+
+                        if "logprobs" in data["choices"][0]:
+                            raw_lp = data["choices"][0]["logprobs"]
+                            if isinstance(raw_lp, list):
+                                logprobs_chunks = [
+                                    lp for lp in raw_lp if isinstance(lp, dict)
+                                ]
+                            elif isinstance(raw_lp, dict):
+                                logprobs_chunks.append(raw_lp)
 
         except aiohttp.ClientResponseError as e:
             error_response_code = e.status

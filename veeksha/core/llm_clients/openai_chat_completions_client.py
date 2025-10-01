@@ -120,6 +120,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
             max_tokens_limit = request_config.sampling_params.get("max_tokens")
 
         last_token_batch_emission = 0
+        is_first_emission = True  # Track if this is the first dashboard event emission
 
         try:
             async with session.post(address, json=body, headers=headers) as response:
@@ -201,11 +202,12 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                             total_output_tokens=tokens_received,
                             ttft_ms=current_ttft_ms,
                             current_tpot_ms=current_tpot_ms,
-                            is_first_token=(len(inter_token_times) == 1),
+                            is_first_token=is_first_emission,
                             recent_tbt_ms=recent_tbt_ms,
                             benchmark_id=request_config.benchmark_id
                         ))
                         last_token_batch_emission = tokens_received
+                        is_first_emission = False  # After first emission, no longer first
 
         except aiohttp.ClientResponseError as e:
             error_response_code = e.status

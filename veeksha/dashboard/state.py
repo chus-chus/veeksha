@@ -65,6 +65,7 @@ class SingleBenchmarkState:
     aggregate_stats: AggregateStats = field(default_factory=AggregateStats)
     capacity_search: CapacitySearchState = field(default_factory=CapacitySearchState)
     benchmark_start_time: Optional[float] = None
+    benchmark_end_time: Optional[float] = None
     current_qps: float = 0.0
 
 class DashboardState:
@@ -196,6 +197,12 @@ class DashboardState:
         benchmark.aggregate_stats.completed_count = event.completed_requests
         benchmark.aggregate_stats.error_count = event.errored_requests
 
+        # If all requests are completed or errored, mark benchmark as ended
+        if (event.completed_requests + event.errored_requests == event.total_requests
+            and event.total_requests > 0
+            and benchmark.benchmark_end_time is None):
+            benchmark.benchmark_end_time = time.time()
+
     def _handle_request_error(self, event: RequestErrorEvent) -> None:
         benchmark = self._get_or_create_benchmark(event.benchmark_id)
 
@@ -272,5 +279,7 @@ class DashboardState:
                 benchmark = self.benchmarks[bid]
                 if benchmark.benchmark_start_time is None:
                     return 0.0
-                return time.time() - benchmark.benchmark_start_time
+                # If benchmark has ended, use end time; otherwise use current time
+                end_time = benchmark.benchmark_end_time or time.time()
+                return end_time - benchmark.benchmark_start_time
             return 0.0
