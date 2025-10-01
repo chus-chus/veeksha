@@ -132,15 +132,16 @@ class TTFTGraph(LiveGraph):
         plt.clear_data()
         plt.clear_figure()
         plt.theme("dark")
-        
-        plt.plot(recent_times, recent_points, marker="dot")
-        plt.plotsize(78, 13)
+
+        plt.plot(recent_times, recent_points, marker="dot", color="cyan")
+        plt.plotsize(68, 12)
         plt.title(f"TTFT - {status} | Latest: {latest_val:.1f}ms, Avg: {avg_val:.1f}ms {perf_indicator}")
-        plt.xlabel("Time (seconds)")
+        plt.xlabel("Time (s)")
         plt.ylabel("TTFT (ms)")
-        plt.grid(True)
+        plt.grid(True, True)
 
         plot_str = plt.build()
+        plt.clear_figure()  # Extra clear to prevent contamination
         self.update(plot_str)
 
 
@@ -179,15 +180,16 @@ class TPOTGraph(LiveGraph):
         plt.clear_data()
         plt.clear_figure()
         plt.theme("dark")
-        
-        plt.plot(recent_times, recent_points, marker="dot")
-        plt.plotsize(78, 13)
+
+        plt.plot(recent_times, recent_points, marker="dot", color="green")
+        plt.plotsize(68, 12)
         plt.title(f"TPOT - {status} | Latest: {latest_val:.1f}ms, Avg: {avg_val:.1f}ms {perf_indicator}")
-        plt.xlabel("Time (seconds)")
+        plt.xlabel("Time (s)")
         plt.ylabel("TPOT (ms)")
-        plt.grid(True)
+        plt.grid(True, True)
 
         plot_str = plt.build()
+        plt.clear_figure()  # Extra clear to prevent contamination
         self.update(plot_str)
 
 
@@ -227,14 +229,15 @@ class TBTGraph(LiveGraph):
         plt.clear_figure()
         plt.theme("dark")
 
-        plt.plot(recent_times, recent_points, marker="dot")
-        plt.plotsize(78, 13)
+        plt.plot(recent_times, recent_points, marker="dot", color="yellow")
+        plt.plotsize(68, 12)
         plt.title(f"TBT - {status} | Latest: {latest_val:.1f}ms, Avg: {avg_val:.1f}ms {perf_indicator}")
-        plt.xlabel("Time (seconds)")
+        plt.xlabel("Time (s)")
         plt.ylabel("TBT (ms)")
-        plt.grid(True)
+        plt.grid(True, True)
 
         plot_str = plt.build()
+        plt.clear_figure()  # Extra clear to prevent contamination
         self.update(plot_str)
 
 
@@ -331,15 +334,16 @@ class LatencyOverTime(LiveGraph):
         plt.clear_data()
         plt.clear_figure()
         plt.theme("dark")
-        
-        plt.plot(recent_times, recent_points, marker="dot")
-        plt.plotsize(78, 13)
+
+        plt.plot(recent_times, recent_points, marker="dot", color="magenta")
+        plt.plotsize(68, 12)
         plt.title(f"Latency (ms) - {status} | Latest: {latest_val:.0f}, Avg: {avg_val:.0f} {perf_indicator}")
-        plt.xlabel("Time (seconds)")
+        plt.xlabel("Time (s)")
         plt.ylabel("Latency (ms)")
-        plt.grid(True)
+        plt.grid(True, True)
 
         plot_str = plt.build()
+        plt.clear_figure()  # Extra clear to prevent contamination
         self.update(plot_str)
 
 
@@ -375,7 +379,8 @@ class VeekshaDashboard(App):
         border: solid $warning;
         margin: 1;
         padding: 1;
-        height: 18;
+        min-height: 20;
+        max-height: 20;
         background: $surface;
     }
     

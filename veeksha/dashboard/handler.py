@@ -94,23 +94,23 @@ def stop_dashboard_event_processor() -> None:
 def init_dashboard_event_processor(enabled: bool = True, enable_frontend: bool = True, **kwargs) -> Optional[DashboardState]:
     """Initialize the global dashboard event processor. This is thread-safe and idempotent."""
     global _dashboard_event_processor, _dashboard_frontend_thread
-    
+
     if not enabled:
         _dashboard_event_processor = None
         return None
-    
+
     with _dashboard_init_lock:
         if _dashboard_event_processor is None:
             _dashboard_event_processor = DashboardEventHandlerProcessor(**kwargs)
             dashboard_state = _dashboard_event_processor.start()
-            
-            # Launch frontend if requested and not already running
+
+            # Launch Flask frontend if requested and not already running
             if enable_frontend and _dashboard_frontend_thread is None:
                 try:
-                    from veeksha.dashboard.frontend import run_dashboard_frontend
-                    _dashboard_frontend_thread = run_dashboard_frontend(dashboard_state)
+                    from veeksha.dashboard.flask_app import run_dashboard_flask
+                    _dashboard_frontend_thread = run_dashboard_flask(dashboard_state)
                 except ImportError as e:
-                    # Log warning but don't fail if textual not available
+                    # Log warning but don't fail if flask not available
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Dashboard frontend not available: {e}")
@@ -118,7 +118,7 @@ def init_dashboard_event_processor(enabled: bool = True, enable_frontend: bool =
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.error(f"Failed to start dashboard frontend: {e}")
-            
+
             return dashboard_state
         return _dashboard_event_processor.dashboard_state
 

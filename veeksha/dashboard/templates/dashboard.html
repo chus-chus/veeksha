@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veeksha LLM Benchmark Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .benchmark-selector {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .benchmark-selector label {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .benchmark-selector select {
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            font-size: 1em;
+            cursor: pointer;
+            min-width: 300px;
+        }
+
+        .benchmark-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+
+        .stat-card.primary { border-left-color: #667eea; }
+        .stat-card.success { border-left-color: #48bb78; }
+        .stat-card.warning { border-left-color: #f6ad55; }
+        .stat-card.danger { border-left-color: #f56565; }
+
+        .stat-card h3 {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card .value {
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+        .graphs-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .graph-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .graph-card h2 {
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-requests {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .live-requests h2 {
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .live-requests table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .live-requests th {
+            background: rgba(102, 126, 234, 0.2);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.4);
+        }
+
+        .live-requests td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .live-requests tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.live {
+            background: #48bb78;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            opacity: 0.6;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span>🚀</span>
+                Veeksha LLM Benchmark Dashboard
+            </h1>
+            <p>Live Performance Metrics & Analysis</p>
+        </div>
+
+        <div class="benchmark-selector">
+            <label>📊 Benchmark:</label>
+            <select onchange="window.location.href='/benchmark/'+this.value">
+                {% if not benchmarks %}
+                    <option value="">No benchmarks available</option>
+                {% else %}
+                    {% for benchmark_id in benchmarks %}
+                        <option value="{{ benchmark_id }}" {% if benchmark_id == active_benchmark %}selected{% endif %}>
+                            {{ benchmark_id }}
+                        </option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+            <span class="status-indicator live"></span>
+            <span>Live</span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card primary">
+                <h3>Total Requests</h3>
+                <div class="value">{{ stats.get('total_requests', 0) }}</div>
+            </div>
+            <div class="stat-card success">
+                <h3>Completed</h3>
+                <div class="value">{{ stats.get('completed_count', 0) }}</div>
+            </div>
+            <div class="stat-card danger">
+                <h3>Errors</h3>
+                <div class="value">{{ stats.get('error_count', 0) }}</div>
+            </div>
+            <div class="stat-card warning">
+                <h3>Duration</h3>
+                <div class="value">{{ "%.1f"|format(stats.get('duration', 0)) }}s</div>
+            </div>
+            <div class="stat-card primary">
+                <h3>Avg TTFT</h3>
+                <div class="value">{{ "%.1f"|format(stats.get('avg_ttft_ms', 0)) }}ms</div>
+            </div>
+            <div class="stat-card success">
+                <h3>Avg TPOT</h3>
+                <div class="value">{{ "%.1f"|format(stats.get('avg_tpot_ms', 0)) }}ms</div>
+            </div>
+            <div class="stat-card warning">
+                <h3>Avg TBT</h3>
+                <div class="value">{{ "%.1f"|format(stats.get('avg_tbt_ms', 0)) }}ms</div>
+            </div>
+            <div class="stat-card danger">
+                <h3>Avg Latency</h3>
+                <div class="value">{{ "%.0f"|format(stats.get('avg_latency_ms', 0)) }}ms</div>
+            </div>
+        </div>
+
+        <div class="graphs-container">
+            <div class="graph-card">
+                <h2>📈 Time to First Token (TTFT)</h2>
+                {{ render_chart(graph_data.get('ttft', []), '#4fc3f7', 'TTFT (ms)') }}
+            </div>
+            <div class="graph-card">
+                <h2>📉 Time per Output Token (TPOT)</h2>
+                {{ render_chart(graph_data.get('tpot', []), '#66bb6a', 'TPOT (ms)') }}
+            </div>
+            <div class="graph-card">
+                <h2>⏱️ Time Between Tokens (TBT)</h2>
+                {{ render_chart(graph_data.get('tbt', []), '#ffa726', 'TBT (ms)') }}
+            </div>
+            <div class="graph-card">
+                <h2>📊 End-to-End Latency</h2>
+                {{ render_chart(graph_data.get('latency', []), '#ab47bc', 'Latency (ms)') }}
+            </div>
+        </div>
+
+        <div class="live-requests">
+            <h2>🔴 Live Requests</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Request ID</th>
+                        <th>Input Tokens</th>
+                        <th>Output Tokens</th>
+                        <th>TTFT (ms)</th>
+                        <th>TPOT (ms)</th>
+                        <th>Progress</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if not live_requests %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; opacity: 0.5;">No active requests</td>
+                        </tr>
+                    {% else %}
+                        {% for req in live_requests %}
+                            <tr>
+                                <td>{{ req.request_id }}</td>
+                                <td>{{ req.input_tokens }}</td>
+                                <td>{{ req.output_tokens }}</td>
+                                <td>{{ "%.1f"|format(req.ttft_ms) if req.ttft_ms else '-' }}</td>
+                                <td>{{ "%.1f"|format(req.tpot_ms) if req.tpot_ms else '-' }}</td>
+                                <td>{{ "%.0f%%"|format(req.progress_pct) if req.progress_pct else '-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>Veeksha LLM Benchmark Analytics • Updated every 500ms</p>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh page every 1 second for live updates
+        setTimeout(() => location.reload(), 1000);
+
+        // Prevent scroll position reset on refresh
+        if (window.performance && performance.navigation.type === 1) {
+            window.scrollTo(0, sessionStorage.getItem('scrollPos') || 0);
+        }
+        window.addEventListener('beforeunload', () => {
+            sessionStorage.setItem('scrollPos', window.scrollY);
+        });
+    </script>
+</body>
+</html>
