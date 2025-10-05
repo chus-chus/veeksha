@@ -150,7 +150,12 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
         previous_token_count = 0
 
         most_recent_received_token_time = time.monotonic()
-        request_dispatched_at = time.monotonic() - self.start_time
+        # Prefer absolute dispatch time provided by the dispatcher; fallback to local now
+        request_dispatched_at = (
+            request_config.dispatched_at
+            if getattr(request_config, "dispatched_at", None) is not None
+            else time.monotonic()
+        )
         # Respect a local cap on tokens to avoid mismatches with server/tokenizer
         max_tokens_limit = None
         if isinstance(request_config.sampling_params, dict):

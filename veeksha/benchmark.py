@@ -7,7 +7,7 @@ import time
 from multiprocessing import Queue
 from queue import Empty
 from threading import Thread
-from typing import List, Optional
+from typing import List, Optional, Tuple, cast
 
 import requests
 from tqdm import tqdm  # type: ignore
@@ -27,6 +27,7 @@ from veeksha.core.seeding import (
     SeedManager,
 )
 from veeksha.generators.request_generator.base_generator import BaseRequestGenerator
+from veeksha.core.request_config import RequestConfig
 from veeksha.generators.request_generator.generator_registry import (
     RequestGeneratorRegistry,
 )
@@ -152,7 +153,10 @@ def dispatch_requests(
 
             # get next request and its dispatch time
             try:
-                request_config, input_length, output_length, next_timestamp = request_generator.get_request()
+                req_tuple = request_generator.get_request()
+                request_config, input_length, output_length, next_timestamp = cast(
+                    Tuple["RequestConfig", int, int, float], req_tuple
+                )
             except StopIteration as e:
                 service_metrics.notify_error(e)
                 stop_event.set()
@@ -189,8 +193,12 @@ def dispatch_requests(
 
             # dispatch
             service_metrics.register_launched_request()
+            # record absolute dispatch time using monotonic clock
+            request_config.dispatched_at = time.monotonic()
             input_queue.put(request_config)
-            logger.info(f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, timestamp {next_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}")
+            logger.info(
+                f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, timestamp {next_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}"
+            )
         else:
             time.sleep(0.01)
 
