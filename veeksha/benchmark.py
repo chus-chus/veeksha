@@ -142,6 +142,8 @@ def dispatch_requests(
 ) -> None:
     """Thread function to generate and dispatch requests."""
     num_errored_requests_handled = 0
+    # Empirical cumulative schedule in seconds since this thread started handling the first request
+    cumulative_empirical_timestamp = 0.0
 
     while not stop_event.is_set():
         if should_send_new_request(service_metrics, num_errored_requests_handled):
@@ -193,18 +195,15 @@ def dispatch_requests(
 
             # dispatch
             service_metrics.register_launched_request()
-            # record enqueue time and scheduled timestamp for comparability
-            request_config.enqueued_at = time.monotonic()
-            try:
-                epoch = float(os.environ.get("VEEKSHA_BENCHMARK_EPOCH_MONO", "0"))
-            except Exception:
-                epoch = 0.0
-            request_config.scheduled_timestamp = (
-                request_config.enqueued_at - epoch if epoch > 0 else request_config.enqueued_at
-            )
+            # record enqueue time (absolute) and empirical scheduled time (cumulative elapsed)
+            now_mono = time.monotonic()
+            empirical_delay = now_mono - request_start_time
+            request_config.enqueued_at = now_mono
+            request_config.scheduled_timestamp = cumulative_empirical_timestamp + empirical_delay
+            cumulative_empirical_timestamp = request_config.scheduled_timestamp
             input_queue.put(request_config)
             logger.info(
-                f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, enqueued at {request_config.enqueued_at}, scheduled at {request_config.scheduled_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}"
+                f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, enqueued at {request_config.enqueued_at}, scheduled at {request_config.scheduled_timestamp}, (mono - start_time = {empirical_delay}), theoretical dispatch delay {request_dispatch_delay}"
             )
         else:
             time.sleep(0.01)
