@@ -204,7 +204,7 @@ def dispatch_requests(
             )
             input_queue.put(request_config)
             logger.info(
-                f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, timestamp {next_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}"
+                f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, enqueued at {request_config.enqueued_at}, scheduled at {request_config.scheduled_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}"
             )
         else:
             time.sleep(0.01)
