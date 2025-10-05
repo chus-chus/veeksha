@@ -106,6 +106,9 @@ class ServiceMetrics:
 
     def store_output(self):
         self.metric_store.store_output(self.output_dir)
+        
+    def print_terminal_table(self):
+        self.metric_store.print_terminal_table()
 
     def request_stop(self) -> None:
         """Signal main loop to stop as soon as possible."""

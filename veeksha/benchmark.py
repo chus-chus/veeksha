@@ -410,6 +410,8 @@ def run_benchmark(
     logger.info(f"Metrics stored to {service_metrics.output_dir}")
 
     store_generated_texts(service_metrics.output_dir, generated_responses)
+    
+    service_metrics.print_terminal_table()
 
     # lm-eval specific
     if (

@@ -19,6 +19,8 @@ class CDFSketch:
         self,
         metric_name: str,
         should_write_to_wandb: bool = True,
+        display_unit_scale: float = 1.0,
+        display_unit_suffix: str = "",
     ) -> None:
         # metrics are a data series of two-dimensional (x, y) datapoints
         self.sketch = DDSketch(relative_accuracy=0.001)
@@ -30,6 +32,9 @@ class CDFSketch:
         self.last_data = 0
 
         self.should_write_to_wandb = should_write_to_wandb
+        # Display-only scaling. Internal values remain unscaled (seconds, tokens, etc.).
+        self.display_unit_scale = display_unit_scale
+        self.display_unit_suffix = display_unit_suffix
 
     def __len__(self):
         return int(self.sketch.count)
@@ -94,10 +99,15 @@ class CDFSketch:
     def _to_df(self) -> pd.DataFrame:
         # get quantiles at 1% intervals
         quantiles = np.linspace(0, 1, 101)
-        # get quantile values
-        quantile_values = [self.sketch.get_quantile_value(q) for q in quantiles]
-        # create dataframe
-        df = pd.DataFrame({"cdf": quantiles, self.metric_name: quantile_values})
+        # get quantile values and apply display scaling
+        quantile_values = []
+        for q in quantiles:
+            v = self.sketch.get_quantile_value(q)
+            v = 0.0 if v is None else v
+            quantile_values.append(v * self.display_unit_scale)
+        # create dataframe with display name
+        display_name = f"{self.metric_name}{self.display_unit_suffix}"
+        df = pd.DataFrame({"cdf": quantiles, display_name: quantile_values})
 
         return df
 
@@ -119,22 +129,23 @@ class CDFSketch:
             return
 
         if x_axis_label is None:
-            x_axis_label = self.metric_name
+            x_axis_label = f"{self.metric_name}{self.display_unit_suffix}"
 
         df = self._to_df()
+        display_name = f"{self.metric_name}{self.display_unit_suffix}"
 
         fig = rk.line(
             df,
-            x=self.metric_name,
+            x=display_name,
             y="cdf",
             markers=True,
-            labels={self.metric_name: x_axis_label, "cdf": "CDF"},
+            labels={display_name: x_axis_label, "cdf": "CDF"},
         )
 
         if wandb.run and self.should_write_to_wandb:
             wandb_df = df.copy()
-            # rename the self.metric_name column to x_axis_label
-            wandb_df = wandb_df.rename(columns={self.metric_name: x_axis_label})
+            # rename the display column to x_axis_label for wandb plot readability
+            wandb_df = wandb_df.rename(columns={display_name: x_axis_label})
 
             wandb.log(
                 {
@@ -151,26 +162,23 @@ class CDFSketch:
         fig.save(f"{path}/{plot_name}.png")
         self._save_df(df, path, plot_name)
 
-    def get_summary(self) -> Dict[str, Optional[float]]:
-        return (
-            {
-                f"{self.metric_name} (Mean)": self.sketch.avg,
-                **{
-                    f"{self.metric_name} (P{int(p * 100)})": self.sketch.get_quantile_value(
-                        p
-                    )
-                    for p in SUMMARY_PERCENTILES
-                },
-            }
-            if self.sketch.count > 0
-            else {
-                f"{self.metric_name} (Mean)": 0,
-                **{
-                    f"{self.metric_name} (P{int(p * 100)})": 0
-                    for p in SUMMARY_PERCENTILES
-                },
-            }
-        )
+    def get_summary(self) -> Dict[str, float]:
+        display_name = f"{self.metric_name}{self.display_unit_suffix}"
+        if self.sketch.count > 0:
+            avg = self.sketch.avg
+            avg = 0.0 if avg is None else avg
+            summary = {f"{display_name} (Mean)": avg * self.display_unit_scale}
+            for p in SUMMARY_PERCENTILES:
+                val = self.sketch.get_quantile_value(p)
+                val = 0.0 if val is None else val
+                summary[f"{display_name} (P{int(p * 100)})"] = (
+                    val * self.display_unit_scale
+                )
+            return summary
+        return {
+            f"{display_name} (Mean)": 0,
+            **{f"{display_name} (P{int(p * 100)})": 0 for p in SUMMARY_PERCENTILES},
+        }
 
     def to_csv_row(self) -> str:
         return ",".join([f"{v:.5f}" for v in self.get_summary().values()])
