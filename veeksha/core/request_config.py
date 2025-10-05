@@ -21,7 +21,7 @@ class RequestConfig(BaseModel):
     sampling_params: Optional[Dict[str, Any]] = None
     llm_api: Optional[str] = None
     address_append_value: Optional[str] = None
-    dispatched_at: Optional[float] = None
+    enqueued_at: Optional[float] = None
     id: Optional[int] = None
 
     def __str__(self) -> str:

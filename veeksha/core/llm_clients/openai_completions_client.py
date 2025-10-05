@@ -150,11 +150,23 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
         previous_token_count = 0
 
         most_recent_received_token_time = time.monotonic()
-        # Prefer absolute dispatch time provided by the dispatcher; fallback to local now
+        # Compute dispatch timing relative to enqueue
+        now_mono = time.monotonic()
+        enqueued_at = getattr(request_config, "enqueued_at", None)
+        if isinstance(enqueued_at, (int, float)):
+            client_dispatch_delay = max(0.0, now_mono - float(enqueued_at))
+            absolute_dispatch_time = float(enqueued_at) + client_dispatch_delay
+        else:
+            client_dispatch_delay = 0.0
+            absolute_dispatch_time = now_mono
+
+        # Convert to relative benchmark epoch if provided
+        try:
+            epoch = float(os.environ.get("VEEKSHA_BENCHMARK_EPOCH_MONO", "0"))
+        except Exception:
+            epoch = 0.0
         request_dispatched_at = (
-            request_config.dispatched_at
-            if getattr(request_config, "dispatched_at", None) is not None
-            else time.monotonic()
+            absolute_dispatch_time - epoch if epoch > 0 else absolute_dispatch_time
         )
         # Respect a local cap on tokens to avoid mismatches with server/tokenizer
         max_tokens_limit = None
@@ -262,7 +274,8 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
             )
 
         metrics = RequestMetrics(
-            request_dispatched_at=request_dispatched_at,
+            request_dispatched_at=float(request_dispatched_at),
+            client_dispatch_delay=float(client_dispatch_delay),
             inter_token_times=inter_token_times,
             num_prompt_tokens=prompt_len,
             num_output_tokens=tokens_received,

@@ -193,8 +193,8 @@ def dispatch_requests(
 
             # dispatch
             service_metrics.register_launched_request()
-            # record absolute dispatch time using monotonic clock
-            request_config.dispatched_at = time.monotonic()
+            # record enqueue time using monotonic clock
+            request_config.enqueued_at = time.monotonic()
             input_queue.put(request_config)
             logger.info(
                 f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, timestamp {next_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}"
@@ -266,6 +266,9 @@ def run_main_loop(
         input_queue=input_queue,
         output_queue=output_queue,
     )
+
+    # Establish a common monotonic epoch for relative timing across processes
+    os.environ["VEEKSHA_BENCHMARK_EPOCH_MONO"] = str(time.monotonic())
 
     # Start the request launcher processes
     req_launcher.start()

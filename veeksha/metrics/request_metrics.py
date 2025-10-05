@@ -14,6 +14,7 @@ class RequestMetrics:
     inter_token_times: List[float]
     num_prompt_tokens: int
     num_output_tokens: int
+    client_dispatch_delay: float = 0.0
     error_msg: Optional[str] = None
     error_code: Optional[int] = None
 
