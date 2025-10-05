@@ -22,6 +22,7 @@ class RequestConfig(BaseModel):
     llm_api: Optional[str] = None
     address_append_value: Optional[str] = None
     enqueued_at: Optional[float] = None
+    scheduled_timestamp: Optional[float] = None
     id: Optional[int] = None
 
     def __str__(self) -> str:

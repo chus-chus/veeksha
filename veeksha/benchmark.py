@@ -193,8 +193,15 @@ def dispatch_requests(
 
             # dispatch
             service_metrics.register_launched_request()
-            # record enqueue time using monotonic clock
+            # record enqueue time and scheduled timestamp for comparability
             request_config.enqueued_at = time.monotonic()
+            try:
+                epoch = float(os.environ.get("VEEKSHA_BENCHMARK_EPOCH_MONO", "0"))
+            except Exception:
+                epoch = 0.0
+            request_config.scheduled_timestamp = (
+                request_config.enqueued_at - epoch if epoch > 0 else request_config.enqueued_at
+            )
             input_queue.put(request_config)
             logger.info(
                 f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, timestamp {next_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}"

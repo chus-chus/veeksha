@@ -121,14 +121,19 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
             client_dispatch_delay = 0.0
             absolute_dispatch_time = now_mono
 
-        # Convert to relative benchmark epoch if provided
-        try:
-            epoch = float(os.environ.get("VEEKSHA_BENCHMARK_EPOCH_MONO", "0"))
-        except Exception:
-            epoch = 0.0
-        request_dispatched_at = (
-            absolute_dispatch_time - epoch if epoch > 0 else absolute_dispatch_time
-        )
+        # Set dispatch time to generator's scheduled timestamp plus client delay when available
+        scheduled_timestamp = getattr(request_config, "scheduled_timestamp", None)
+        if isinstance(scheduled_timestamp, (int, float)):
+            request_dispatched_at = float(scheduled_timestamp) + float(client_dispatch_delay)
+        else:
+            # Fallback to epoch-relative time for robustness
+            try:
+                epoch = float(os.environ.get("VEEKSHA_BENCHMARK_EPOCH_MONO", "0"))
+            except Exception:
+                epoch = 0.0
+            request_dispatched_at = (
+                absolute_dispatch_time - epoch if epoch > 0 else absolute_dispatch_time
+            )
         logger.info(
             f"Request {request_config.id} dispatched at {request_dispatched_at}"
         )
