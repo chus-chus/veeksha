@@ -133,7 +133,7 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
 
         self.request_id += 1
 
-        return request_config
+        return request_config, input_length, output_length, next_timestamp
 
     def save_trace(self, file_path: str, timestamp_unit: str = "s") -> None:
         """Save the internally generated trace to a file.

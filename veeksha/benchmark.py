@@ -152,7 +152,7 @@ def dispatch_requests(
 
             # get next request and its dispatch time
             try:
-                request_config = request_generator.get_request()
+                request_config, input_length, output_length, next_timestamp = request_generator.get_request()
             except StopIteration as e:
                 service_metrics.notify_error(e)
                 stop_event.set()
@@ -190,7 +190,7 @@ def dispatch_requests(
             # dispatch
             service_metrics.register_launched_request()
             input_queue.put(request_config)
-            logger.info(f"Dispatched request {request_config.id}")
+            logger.info(f"Dispatched request with prompt length {input_length} and output length {output_length} at timestamp {next_timestamp} (time.monotonic() = {time.monotonic()})")
         else:
             time.sleep(0.01)
 
