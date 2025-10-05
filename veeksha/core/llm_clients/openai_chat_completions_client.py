@@ -112,6 +112,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
 
         most_recent_received_token_time = time.monotonic()
         request_dispatched_at = time.monotonic() - self.start_time
+        logger.info(f"Request dispatched at {request_dispatched_at}")
         # Respect a local cap on tokens to avoid mismatches with server/tokenizer
         max_tokens_limit = None
         if isinstance(request_config.sampling_params, dict):
@@ -207,6 +208,8 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
             error_code=error_response_code,
             error_msg=error_msg,
         )
+        
+        logger.info(f"Request metrics: dispatched at {request_dispatched_at}, inter token times {inter_token_times}, prompt length {prompt_len}, output length {tokens_received}")
 
         generated_response: Optional[Response]
         if error_msg or error_response_code:
