@@ -135,7 +135,7 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
 
         return request_config
 
-    def save_trace(self, file_path: str, timestamp_unit: str = "ms") -> None:
+    def save_trace(self, file_path: str, timestamp_unit: str = "s") -> None:
         """Save the internally generated trace to a file.
 
         The saved dataframe has columns: prompt, input_length, output_length, timestamp.
