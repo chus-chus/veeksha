@@ -112,7 +112,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
 
         most_recent_received_token_time = time.monotonic()
         request_dispatched_at = time.monotonic() - self.start_time
-        logger.info(f"Request dispatched at {request_dispatched_at}")
+        logger.info(f"Request {request_config.id} dispatched at {request_dispatched_at}")
         # Respect a local cap on tokens to avoid mismatches with server/tokenizer
         max_tokens_limit = None
         if isinstance(request_config.sampling_params, dict):

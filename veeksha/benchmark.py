@@ -190,7 +190,7 @@ def dispatch_requests(
             # dispatch
             service_metrics.register_launched_request()
             input_queue.put(request_config)
-            logger.info(f"Dispatched request, in {input_length}, out {output_length}, timestamp {next_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}")
+            logger.info(f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, timestamp {next_timestamp}, (mono - start_time = {time.monotonic() - request_start_time}), theoretical dispatch delay {request_dispatch_delay}")
         else:
             time.sleep(0.01)
 
