@@ -146,7 +146,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
             async with session.post(address, json=body, headers=headers) as response:
                 response.raise_for_status()
 
-                async for data in self._process_stream(response):
+                async for data, arrival_ts in self._process_stream(response):
                     if "error" in data:
                         err = data.get("error") or {}
                         error_msg = err.get("message", "Unknown error")
@@ -179,22 +179,14 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
 
                         if allowable_to_add > 0:
                             inter_token_times.append(
-                                time.monotonic() - most_recent_received_token_time
+                                arrival_ts - most_recent_received_token_time
                             )
                             if allowable_to_add > 1:
                                 inter_token_times.extend([0] * (allowable_to_add - 1))
                             tokens_received += allowable_to_add
-                            most_recent_received_token_time = time.monotonic()
+                            most_recent_received_token_time = arrival_ts
                             # We still append full text; metrics cap governs counts/timings
                             generated_text += delta["content"]
-
-                            # Truncate generated_text to exactly tokens_received tokens
-                            if isinstance(max_tokens_limit, int):
-                                output_token_ids = self.tokenizer.encode(generated_text)
-                                if len(output_token_ids) > tokens_received:
-                                    generated_text = self.tokenizer.decode(
-                                        output_token_ids[:tokens_received]
-                                    )
 
                         # If we've reached or exceeded the cap, stop processing further chunks
                         if (

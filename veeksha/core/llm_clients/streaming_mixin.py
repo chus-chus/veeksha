@@ -1,5 +1,6 @@
 import json
 from typing import AsyncGenerator, Dict, List, Protocol, Tuple, cast
+import time
 
 import aiohttp
 
@@ -22,7 +23,7 @@ class StreamingMixin:
 
     async def _process_stream(
         self, response: aiohttp.ClientResponse
-    ) -> AsyncGenerator[Dict, None]:
+    ) -> AsyncGenerator[Tuple[Dict, float], None]:
         """Process Server-Sent Events (SSE) stream and yield parsed JSON dicts.
 
         Skips non-data lines and stops on "[DONE]" sentinel.
@@ -39,11 +40,12 @@ class StreamingMixin:
                     continue
 
                 payload = line[len("data:") :].strip()
+                arrival_ts = time.monotonic()
                 if payload == "[DONE]":
                     return
 
                 try:
-                    yield json.loads(payload)
+                    yield json.loads(payload), arrival_ts
                 except json.JSONDecodeError:
                     logger.exception(f"JSON decode error with chunk: {payload}")
 
@@ -64,10 +66,10 @@ class StreamingMixin:
         Returns a tuple of (new_tokens_in_this_chunk, updated_previous_token_count).
         """
         previous_responses.append(current_response)
-        current_tokens_received = (
-            self.total_tokens(previous_responses) - previous_token_count
-        )
+        total_count_now = self.total_tokens(previous_responses)
+        current_tokens_received = max(0, total_count_now - previous_token_count)
         if len(previous_responses) > self.MAX_RESPONSES_ALLOWED_TO_STORE:
             previous_responses.pop(0)
-        previous_token_count = self.total_tokens(previous_responses)
+        # Accumulate total token count without re-tokenizing the window again
+        previous_token_count = previous_token_count + current_tokens_received
         return current_tokens_received, previous_token_count
