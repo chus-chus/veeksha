@@ -4,6 +4,7 @@ from multiprocessing import Process
 from multiprocessing import Queue as MPQueue
 from queue import Empty
 from typing import Any, Callable, List, Optional
+import time
 
 import aiohttp
 
@@ -57,8 +58,28 @@ class RequestsLauncher:
             llm_api=self.client_config.llm_api,
         )
 
+        # Attach tracing to capture precise client-side request timings (e.g. write completion)
+        trace_config = aiohttp.TraceConfig()
+
+        @trace_config.on_request_start.append
+        async def _on_request_start(session: aiohttp.ClientSession, context: Any, params: Any) -> None:
+            try:
+                if isinstance(context, dict):
+                    context["request_start_at"] = time.monotonic()
+            except Exception:
+                pass
+
+        @trace_config.on_request_chunk_sent.append
+        async def _on_request_chunk_sent(session: aiohttp.ClientSession, context: Any, params: Any) -> None:
+            try:
+                if isinstance(context, dict):
+                    context["last_chunk_sent_at"] = time.monotonic()
+            except Exception:
+                pass
+
         async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=self.client_config.request_timeout)
+            timeout=aiohttp.ClientTimeout(total=self.client_config.request_timeout),
+            trace_configs=[trace_config],
         ) as session:
             tasks = [
                 asyncio.create_task(

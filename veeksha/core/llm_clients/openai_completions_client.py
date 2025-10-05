@@ -179,7 +179,8 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
             max_tokens_limit = request_config.sampling_params.get("max_tokens")
 
         try:
-            async with session.post(address, json=body, headers=headers) as response:
+            trace_ctx = {"request_id": request_config.id}
+            async with session.post(address, json=body, headers=headers, trace_request_ctx=trace_ctx) as response:
                 response.raise_for_status()
 
                 if not stream:
@@ -222,9 +223,14 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
                                     ),
                                 )
                             if allowable_to_add > 0:
-                                inter_token_times.append(
-                                    arrival_ts - most_recent_received_token_time
-                                )
+                                baseline = most_recent_received_token_time
+                                try:
+                                    sent_at = trace_ctx.get("last_chunk_sent_at")
+                                    if sent_at and tokens_received == 0:
+                                        baseline = sent_at
+                                except Exception:
+                                    pass
+                                inter_token_times.append(arrival_ts - baseline)
                                 if allowable_to_add > 1:
                                     inter_token_times.extend(
                                         [0] * (allowable_to_add - 1)
