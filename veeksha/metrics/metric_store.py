@@ -210,7 +210,7 @@ class MetricStore:
             **perf_summary,
         }
 
-    def get_terminal_table(self) -> str:
+    def get_terminal_table(self, only: Optional[list] = None) -> str:
         """Return a formatted ASCII table of metric summaries for the terminal.
 
         Columns: Metric, Min, Max, Mean, Median, P90, P99.
@@ -222,17 +222,43 @@ class MetricStore:
         """
         headers = ["Metric", "Min", "Max", "Mean", "Median", "P90", "P99"]
 
+        # Desired default ordering and labels (time metrics reported in ms)
+        default_keys_in_order = [
+            "end_to_end_latency",
+            "ttft",
+            "tpot",
+            "tbt",
+            "num_prompt_tokens",
+            "num_output_tokens",
+            "num_total_tokens",
+        ]
+        key_to_label = {
+            "end_to_end_latency": "e2e latency (ms)",
+            "ttft": "time to first token (ms)",
+            "tpot": "time per output token (ms)",
+            "tbt": "time between tokens (ms)",
+            "num_prompt_tokens": "num prefill tokens (count)",
+            "num_output_tokens": "num decode tokens (count)",
+            "num_total_tokens": "num total tokens (count)",
+        }
+
         def fmt(value: float) -> str:
             return f"{value:,.3f}"
 
         rows = []
-        for key, sketch in self.summaries.items():
+        keys = default_keys_in_order if only is None else [k for k in only]
+        for key in keys:
+            sketch = self.summaries.get(key)
+            if sketch is None:
+                continue
             # skip empty sketches
             if len(sketch) == 0:
                 continue
 
             # derive display name and scale
-            display_name = f"{sketch.metric_name}{sketch.display_unit_suffix}"
+            display_name = key_to_label.get(
+                key, f"{sketch.metric_name}{sketch.display_unit_suffix}"
+            )
             scale = getattr(sketch, "display_unit_scale", 1.0)
 
             # pull stats from DDSketch; coerce None -> 0.0
@@ -290,9 +316,9 @@ class MetricStore:
 
         return "\n".join(out_lines)
 
-    def print_terminal_table(self) -> None:
+    def print_terminal_table(self, only: Optional[list] = None) -> None:
         """Print the terminal table of metric summaries."""
-        print(self.get_terminal_table())
+        print(self.get_terminal_table(only=only))
 
     def store_output(self, output_dir: str):
         perf_csv_path = os.path.join(output_dir, "perf_metrics.csv")
