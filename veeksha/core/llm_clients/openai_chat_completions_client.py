@@ -146,10 +146,6 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
             async with session.post(address, json=body, headers=headers) as response:
                 response.raise_for_status()
 
-                logger.info(
-                    f"[request {request_config.id}] opened stream: status={response.status} url={address}"
-                )
-
                 async for data in self._process_stream(response):
                     if "error" in data:
                         err = data.get("error") or {}
@@ -157,9 +153,6 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                         code_value = err.get("code")
                         error_response_code = (
                             code_value if isinstance(code_value, int) else 400
-                        )
-                        logger.warning(
-                            f"[request {request_config.id}] stream error: code={error_response_code} msg={error_msg}"
                         )
                         break  # Stop processing on error
                     delta = data["choices"][0]["delta"]
@@ -184,12 +177,6 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                                 ),
                             )
 
-                        logger.info(
-                            f"[request {request_config.id}] chunk received: content={repr(delta.get('content'))} "
-                            f"chunk_tokens={current_tokens_received} allowable_to_add={allowable_to_add} "
-                            f"tokens_before={tokens_received}"
-                        )
-
                         if allowable_to_add > 0:
                             inter_token_times.append(
                                 time.monotonic() - most_recent_received_token_time
@@ -209,24 +196,11 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
                                         output_token_ids[:tokens_received]
                                     )
 
-                            zeros_added = max(0, allowable_to_add - 1)
-                            if zeros_added:
-                                logger.info(
-                                    f"[request {request_config.id}] inserted {zeros_added} zero inter-token times "
-                                    f"due to multiple tokens in single chunk"
-                                )
-                            logger.info(
-                                f"[request {request_config.id}] tokens_after={tokens_received}"
-                            )
-
                         # If we've reached or exceeded the cap, stop processing further chunks
                         if (
                             isinstance(max_tokens_limit, int)
                             and tokens_received >= max_tokens_limit
                         ):
-                            logger.info(
-                                f"[request {request_config.id}] reached max_tokens cap ({max_tokens_limit}); stopping stream processing"
-                            )
                             break
 
         except aiohttp.ClientResponseError as e:
