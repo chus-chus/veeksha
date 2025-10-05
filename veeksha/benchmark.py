@@ -266,11 +266,13 @@ def run_main_loop(
     output_queue = Queue()
     stop_event = threading.Event()
 
-    # Initialize request launcher
+    # Initialize request launcher with a readiness queue
+    ready_queue = Queue()
     req_launcher = RequestsLauncher(
         client_config=benchmark_config.client_config,
         input_queue=input_queue,
         output_queue=output_queue,
+        ready_queue=ready_queue,
     )
 
     # Establish a common monotonic epoch for relative timing across processes
@@ -278,6 +280,8 @@ def run_main_loop(
 
     # Start the request launcher processes
     req_launcher.start()
+    # Wait for all async workers to be ready before dispatching
+    req_launcher.wait_until_ready()
 
     # Create and start producer-consumer threads
     dispatcher_thread = Thread(

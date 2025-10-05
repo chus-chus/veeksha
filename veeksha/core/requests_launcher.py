@@ -24,10 +24,12 @@ class RequestsLauncher:
         client_config: ClientConfig,
         input_queue: MPQueue,
         output_queue: MPQueue,
+        ready_queue: Optional[MPQueue] = None,
     ):
         self.client_config = client_config
         self.input_queue = input_queue
         self.output_queue = output_queue
+        self.ready_queue = ready_queue
         self.clients: List[Process] = []
 
     def start(self) -> None:
@@ -35,16 +37,16 @@ class RequestsLauncher:
         for client_id in range(self.client_config.num_clients):
             client = Process(
                 target=self.run_client,
-                args=(client_id,),
+                args=(client_id, self.ready_queue),
             )
             self.clients.append(client)
             client.start()
 
-    def run_client(self, client_id: int) -> None:
+    def run_client(self, client_id: int, ready_queue: Optional[MPQueue] = None) -> None:
         """Run a client process that sends requests to the LLM API."""
-        asyncio.run(self.run_async_worker(client_id))
+        asyncio.run(self.run_async_worker(client_id, ready_queue))
 
-    async def run_async_worker(self, client_id: int) -> None:
+    async def run_async_worker(self, client_id: int, ready_queue: Optional[MPQueue]) -> None:
         """Run the async worker that processes requests."""
         logger.debug("Starting async worker %s", client_id)
 
@@ -64,6 +66,13 @@ class RequestsLauncher:
                 )
                 for i in range(self.client_config.num_concurrent_requests_per_client)
             ]
+            # Signal readiness for each task created (available concurrency unit)
+            if ready_queue is not None:
+                for _ in range(self.client_config.num_concurrent_requests_per_client):
+                    try:
+                        ready_queue.put("READY")
+                    except Exception:
+                        pass
             await asyncio.gather(*tasks)
 
         logger.debug("Async worker %s finished", client_id)
@@ -198,3 +207,20 @@ class RequestsLauncher:
         self.complete_tasks()
         for client in self.clients:
             client.join()
+
+    def wait_until_ready(self) -> None:
+        """Block until all worker concurrency units report readiness."""
+        if self.ready_queue is None:
+            return
+        expected = (
+            self.client_config.num_clients
+            * self.client_config.num_concurrent_requests_per_client
+        )
+        ready_count = 0
+        while ready_count < expected:
+            try:
+                msg = self.ready_queue.get(timeout=5.0)
+            except Empty:
+                continue
+            if msg == "READY":
+                ready_count += 1
