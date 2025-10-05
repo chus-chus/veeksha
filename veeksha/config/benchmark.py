@@ -28,6 +28,14 @@ class BenchmarkConfig:
         default=DEFAULT_SEED,
         metadata={"help": "Seed for the random number generator."},
     )
+    vajra_api_url: Optional[str] = field(
+        default=None,
+        metadata={"help": "The API URL for the Vajra benchmark."},
+    )
+    vajra_plots_output_dir: Optional[str] = field(
+        default=None,
+        metadata={"help": "The output directory for the Vajra plots."},
+    )
     timeout: int = field(
         default=1200,
         metadata={"help": "The amount of time to run the load test for."},

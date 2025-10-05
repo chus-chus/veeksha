@@ -9,6 +9,7 @@ from queue import Empty
 from threading import Thread
 from typing import List, Optional
 
+import requests
 from tqdm import tqdm  # type: ignore
 
 from veeksha.benchmark_data_utils import (
@@ -310,7 +311,16 @@ def run_main_loop(
     processor_thread.join()
 
     pbar.close()
-
+    
+    if benchmark_config.vajra_api_url and benchmark_config.vajra_plots_output_dir:
+        # save vajra plots
+        plot_url = f"{benchmark_config.vajra_api_url}/v1/debug/plot_metrics"
+        payload = {"output_dir": benchmark_config.vajra_plots_output_dir}
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(plot_url, json=payload, headers=headers)
+        response.raise_for_status()
+        logger.info("Vajra plots saved to %s.", benchmark_config.vajra_plots_output_dir)
+        
     if service_metrics.error is None:
         logger.info("Main loop completed.")
     else:
