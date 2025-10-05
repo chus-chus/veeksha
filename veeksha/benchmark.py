@@ -291,6 +291,8 @@ def run_main_loop(
         while not service_metrics.should_stop():
             time.sleep(0.1)
         logger.info("Stopping the main loop.")
+        if benchmark_config.request_generator_config.get_type() == RequestGeneratorType.SYNTHETIC:
+            request_generator.save_trace(os.path.join(service_metrics.output_dir, "trace.jsonl"))
         if service_metrics.stop_requested and service_metrics.error is None:
             logger.info(
                 "Main loop exited due to stop policy; partial metrics will be saved."

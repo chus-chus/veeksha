@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional, Union, cast
 
+import pandas as pd
+
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 
 from veeksha.config.client import ClientConfig
@@ -53,6 +55,10 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
         self.corpus_lines = corpus_lines
 
         self.request_id = 0
+
+        # Internal trace state
+        self._trace: List[Dict[str, Any]] = []
+        self._timestamp_accum_s: float = 0.0
 
     def get_request(self) -> RequestConfig:
         (
@@ -113,6 +119,49 @@ class SyntheticRequestGenerator(BaseRequestGenerator):
             id=self.request_id,
         )
 
+        # Accumulate trace row
+        next_timestamp = self._timestamp_accum_s + float(dispatch_delay)
+        self._trace.append(
+            {
+                "prompt": prompt,
+                "input_length": int(prompt_token_count),
+                "output_length": int(num_output_tokens),
+                "timestamp": next_timestamp,
+            }
+        )
+        self._timestamp_accum_s = next_timestamp
+
         self.request_id += 1
 
         return request_config
+
+    def save_trace(self, file_path: str, timestamp_unit: str = "ms") -> None:
+        """Save the internally generated trace to a file.
+
+        The saved dataframe has columns: prompt, input_length, output_length, timestamp.
+
+        Args:
+            file_path: Destination path. Supports .jsonl and .csv extensions.
+            timestamp_unit: Unit for timestamps in the saved file. "s" or "ms".
+        """
+        if not self._trace:
+            logger.info("No generated requests to save; trace is empty.")
+            return
+
+        df = pd.DataFrame(self._trace)
+        if timestamp_unit == "ms":
+            df["timestamp"] = df["timestamp"] * 1000.0
+        elif timestamp_unit != "s":
+            raise ValueError(f"Unsupported timestamp_unit: {timestamp_unit}")
+
+        # Ensure column order
+        df = df[["prompt", "input_length", "output_length", "timestamp"]]
+
+        if file_path.endswith(".jsonl"):
+            df.to_json(file_path, orient="records", lines=True)
+        elif file_path.endswith(".csv"):
+            df.to_csv(file_path, index=False)
+        else:
+            raise ValueError(
+                f"Unsupported file extension for {file_path}; use .jsonl or .csv"
+            )
