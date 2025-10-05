@@ -190,7 +190,7 @@ def dispatch_requests(
             # dispatch
             service_metrics.register_launched_request()
             input_queue.put(request_config)
-            logger.info(f"Dispatched request with prompt length {input_length} and output length {output_length} at timestamp {next_timestamp} (time.monotonic() = {time.monotonic()})")
+            logger.info(f"Dispatched request with prompt length {input_length} and output length {output_length} at timestamp {next_timestamp} (time.monotonic() - request_start_time = {time.monotonic() - request_start_time})")
         else:
             time.sleep(0.01)
 
