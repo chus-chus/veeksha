@@ -66,6 +66,10 @@ class RequestLevelMetrics:
         )
         self.min_tbt_deadline_to_meet.append(min_tbt_deadline_to_meet)
 
+    def put_dispatch_only(self, request_metrics: RequestMetrics):
+        """Record only dispatch time for errored requests."""
+        self.request_dispatched_at.append(request_metrics.request_dispatched_at)
+
     def to_dict(self):
         return {
             "request_dispatched_at": self.request_dispatched_at,

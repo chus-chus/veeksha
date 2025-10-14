@@ -58,8 +58,26 @@ class SessionGeneratorConfig:
             "help": "If save_as_trace_file is true, this is the name of the trace file, without the extension. Config params will be appended to the file name."
         },
     )
+    in_session_request_dispatch_policy: str = field(
+        default="after_prev_response",
+        metadata={
+            "help": "Policy for in-session request dispatch timing. Options: 'absolute' (follow timestamps without waiting for previous response of session) or 'after_prev_response' (dispatch each request after the previous response plus the inter-request interval)."
+        },
+    )
+    cancel_session_on_failure: bool = field(
+        default=False,
+        metadata={
+            "help": "If true, cancel the remaining requests in a session when a prior request errors or times out."
+        },
+    )
 
     def __post_init__(self):
+        valid_policies = {"absolute", "after_prev_response"}
+        if self.in_session_request_dispatch_policy not in valid_policies:
+            raise ValueError(
+                f"in_session_request_dispatch_policy must be one of {valid_policies}, "
+                f"got '{self.in_session_request_dispatch_policy}'"
+            )
         if self.trace_file_name != "" and not self.save_as_trace_file:
             logger.warning(
                 "trace_file_name is provided but save_as_trace_file is false. trace_file_name will be ignored."

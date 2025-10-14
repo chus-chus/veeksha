@@ -150,40 +150,43 @@ class MetricStore:
 
     def add_request_metrics(self, request_metrics: RequestMetrics):
         if request_metrics.error_code:
-            # do not add errored requests to metric sketches
+            # Do not add errored requests to metric sketches, but persist
+            # dispatch times at request-level
             self.error_code_freq[request_metrics.error_code] += 1
             self.num_errored_requests += 1
+            self.request_level_metrics.put_dispatch_only(request_metrics)
             return
         else:
             self.num_completed_requests += 1
 
-        for metric_name, cdf_sketch in self.summaries.items():
-            if metric_name == "tbt":
-                cdf_sketch.extend(request_metrics.inter_token_times[1:])
-            elif metric_name == "deadline_miss_rate":
-                (
-                    deadline_miss_rate,
-                    missed_deadlines,
-                    total_deadlines,
-                ) = get_request_level_deadline_miss_rate(
-                    inter_token_times=request_metrics.inter_token_times,
-                    ttft_deadline=self.ttft_deadline,
-                    tbt_deadline=self.tbt_deadline,
-                )
-                cdf_sketch.put(deadline_miss_rate)
-                self.service_level_missed_deadlines += missed_deadlines
-                self.service_level_total_deadlines += total_deadlines
-            elif metric_name == "min_tbt_deadline_to_meet":
-                cdf_sketch.put(
-                    find_min_tbt_deadline_to_meet(
+            for metric_name, cdf_sketch in self.summaries.items():
+                if metric_name == "tbt":
+                    cdf_sketch.extend(request_metrics.inter_token_times[1:])
+                elif metric_name == "deadline_miss_rate":
+                    (
+                        deadline_miss_rate,
+                        missed_deadlines,
+                        total_deadlines,
+                    ) = get_request_level_deadline_miss_rate(
                         inter_token_times=request_metrics.inter_token_times,
                         ttft_deadline=self.ttft_deadline,
-                        target_deadline_miss_rate=self.target_deadline_miss_rate,
+                        tbt_deadline=self.tbt_deadline,
                     )
-                )
-            else:
-                cdf_sketch.put(getattr(request_metrics, metric_name))
+                    cdf_sketch.put(deadline_miss_rate)
+                    self.service_level_missed_deadlines += missed_deadlines
+                    self.service_level_total_deadlines += total_deadlines
+                elif metric_name == "min_tbt_deadline_to_meet":
+                    cdf_sketch.put(
+                        find_min_tbt_deadline_to_meet(
+                            inter_token_times=request_metrics.inter_token_times,
+                            ttft_deadline=self.ttft_deadline,
+                            target_deadline_miss_rate=self.target_deadline_miss_rate,
+                        )
+                    )
+                else:
+                    cdf_sketch.put(getattr(request_metrics, metric_name))
 
+        # Record full request-level metrics for successful requests
         self.request_level_metrics.put(request_metrics)
 
     def get_aggregated_summary(self) -> Dict[str, float]:

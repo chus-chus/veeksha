@@ -76,7 +76,7 @@ class TraceRequestGeneratorConfig(BaseRequestGeneratorConfig):
     remap_hash_ids: bool = field(
         default=False,
         metadata={
-            "help": "If True and use_trace_prefix_hash_ids, randomly remap prefix hash IDs.",
+            "help": "If True and use_trace_prefix_hash_ids, randomly remap prefix hash IDs. Will also remap hash_ids when trace is exhausted and exhaustion_policy is set to 'wrap'.",
         },
     )
     use_trace_sessions: Optional[bool] = field(

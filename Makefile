@@ -14,7 +14,7 @@ lint/pyright: ## run type checking
 	pyright
 
 lint/codespell:
-	codespell --skip './env/**,./docs/_build/**,./veeksha/lm_eval/**,./veeksha.egg-info/**' -L inout
+	codespell --skip './env/**,./docs/_build/**,./veeksha/lm_eval/**,./veeksha.egg-info/**,./test_output/**,./benchmark_results/**' -L inout
 
 lint: lint/isort lint/black lint/autoflake lint/codespell lint/pyright	## check style
 
@@ -30,28 +30,39 @@ format/autoflake: ## remove unused imports
 format: format/isort format/autoflake format/black ## format code
 
 # Test targets
-test: test/unit test/functional ## Run all tests
-
-test/unit: ## Run unit tests
-	@echo "Running unit tests..."
-	python -m pytest -s tests -v -m "unit" --tb=short
+test: test/unit test/functional test/gpu ## Run all tests
 
 test/functional: ## Run functional tests
 	@echo "Running functional tests..."
-	python -m pytest -s tests/functional -v -m "functional and not gpu" --tb=short
+	python -m pytest -s tests/functional -v -m "functional and not gpu" --tb=short \
+			--junitxml=test_output/pytest-functional-nogpu-results.xml \
+			--cov=veeksha --cov-append --cov-report=
 
 test/gpu: ## Run GPU tests
 	@echo "Running GPU tests..."
-	python -m pytest -s tests/functional -v -m "gpu" --tb=short
+	python -m pytest -s tests/functional -v -m "gpu" --tb=short \
+			--junitxml=test_output/pytest-functional-gpu-results.xml \
+			--cov=veeksha --cov-append --cov-report=
+
+# optional: keep unit generating initial data but skip reports, or regenerate at end
+test/unit: ## Run unit tests
+	@echo "Running unit tests..."
+	python -m pytest -s tests -v -m "unit" --tb=short \
+			--junitxml=test_output/pytest-unit-results.xml \
+			--cov=veeksha --cov-report=
+	
+test/integration: ## Run integration tests
+	@echo "Integration tests not yet implemented..."
 
 test/all: ## Run all tests including GPU
 	@echo "Running all tests..."
-	python -m pytest -s tests -v --tb=short
+	python -m pytest -s tests -v --tb=short  \
+		--junitxml=test_output/pytest-all-results.xml \
 
-# Test with coverage
-test/coverage: ## Run tests with coverage report
-	@echo "Running tests with coverage..."
-	python -m pytest -s tests --cov=veeksha --cov-report=xml --cov-report=html --cov-report=term
+# Emit final coverage reports into mounted test_output directory
+coverage/report:
+	coverage xml -o test_output/python_coverage.xml
+	coverage html -d test_output/python_coverage_html
 
 # Rerun failed tests
 test/failed-only: ## Rerun only failed tests

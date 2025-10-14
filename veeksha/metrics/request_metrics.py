@@ -17,6 +17,8 @@ class RequestMetrics:
     client_dispatch_delay: float = 0.0
     error_msg: Optional[str] = None
     error_code: Optional[int] = None
+    # Request id for correlation when Response is None
+    request_id: Optional[int] = None
 
     @cached_property
     def num_total_tokens(self):

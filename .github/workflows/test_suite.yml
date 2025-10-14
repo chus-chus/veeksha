@@ -1,0 +1,117 @@
+name: "Test Suite"
+on:
+  push:
+    branches: [main, "release/*"]
+  pull_request:
+    branches: [main, "release/*"]
+    types: [labeled, synchronize]
+
+permissions:
+  contents: read
+  packages: write
+  issues: read
+  checks: write
+  pull-requests: write
+  actions: write
+defaults:
+  run:
+    shell: bash -l {0}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}  
+  # we want concurrent jobs on main
+env:
+  CONTAINER_NAME: nvidia/cuda:12.9.0-cudnn-devel-ubuntu24.04
+jobs:
+  test_suite:
+    if: ${{ github.event_name != 'pull_request' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ready')) }}
+    runs-on: [self-hosted, 4xL40]
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: "recursive"
+      - name: "Build CI image"
+        run: |
+          docker build -t veeksha-ci .
+      - name: "Run test container"
+        run: |
+          docker run -d \
+          --gpus "\"device=${NVIDIA_VISIBLE_DEVICES}\""  \
+          --shm-size=12gb \
+          --cpus=24 \
+          -v "${GITHUB_WORKSPACE}/test_output:/repo/test_output" \
+          -w /repo \
+          --name veeksha-testsuite-${{ github.run_id }} \
+          veeksha-ci sleep infinity
+      - name: "Run unit tests"
+        id: run_unit_tests
+        run: |
+          docker exec \
+          -e HUGGINGFACE_TOKEN="${{ secrets.HUGGINGFACE_TOKEN }}" \
+          veeksha-testsuite-${{ github.run_id }} \
+          make test/unit
+      - name: "Run functional (nongpu) tests"
+        id: run_functional_tests_nogpu
+        run: |
+          docker exec \
+          -e HUGGINGFACE_TOKEN="${{ secrets.HUGGINGFACE_TOKEN }}" \
+          veeksha-testsuite-${{ github.run_id }} \
+          make test/functional
+      - name: "Run functional tests (gpu)"
+        id: run_functional_tests_gpu
+        run: |
+          docker exec \
+          -e HUGGINGFACE_TOKEN="${{ secrets.HUGGINGFACE_TOKEN }}" \
+          veeksha-testsuite-${{ github.run_id }} \
+          make test/gpu
+      - name: "Run integration tests"
+        id: run_integration_tests
+        run: |
+          docker exec \
+          -e HUGGINGFACE_TOKEN="${{ secrets.HUGGINGFACE_TOKEN }}" \
+          veeksha-testsuite-${{ github.run_id }} \
+          make test/integration
+      - name: "Generate coverage reports"
+        id: generate_test_reports
+        run: |
+          docker exec veeksha-testsuite-${{ github.run_id }} make coverage/report
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          report_paths: "test_output/*-results.xml"
+          comment: true
+          include_passed: true
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            test_output/python_coverage.xml
+            test_output/python_coverage_html/**
+
+      - name: "Stop Docker container"
+        id: stop_docker_container
+        if: always()
+        run: |
+          docker stop veeksha-testsuite-${{ github.run_id }}
+          docker rm veeksha-testsuite-${{ github.run_id }}
+
+      - name: Notify on Discord
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@master
+        with:
+          args: |
+            ❌ Functional test suite failed on main branch!
+
+            • Commit: ${{ github.sha }}
+            • Run:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            This needs immediate attention.

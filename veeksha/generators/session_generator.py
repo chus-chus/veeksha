@@ -1,6 +1,6 @@
 import copy
 import os
-from typing import Dict, List
+from typing import Dict, List, cast
 
 import numpy as np
 import pandas as pd
@@ -444,6 +444,29 @@ class SessionGenerator:
         for col in requests_df.columns:
             if col not in result_df.columns:
                 raise ValueError(f"Column {col} not found in generated trace")
+
+        # Add per-session sequence, within-session gaps, and anchor timestamp for first request
+        if (
+            not result_df.empty
+            and "session_id" in result_df.columns
+            and "timestamp" in result_df.columns
+        ):
+
+            def _annotate_group(g):
+                g = g.sort_values("timestamp").copy()
+                g["session_sequence_index"] = range(len(g))
+                g["wait_after_prev_response_s"] = g["timestamp"].diff().fillna(0.0)
+                g["anchor_at_s"] = None
+                if not g.empty:
+                    g.loc[g.index[0], "anchor_at_s"] = float(g.iloc[0]["timestamp"])  # type: ignore
+                return g
+
+            result_df = cast(
+                pd.DataFrame,
+                result_df.groupby("session_id", group_keys=False)[
+                    list(result_df.columns)
+                ].apply(_annotate_group),
+            )
 
         self.trace_df = result_df
 

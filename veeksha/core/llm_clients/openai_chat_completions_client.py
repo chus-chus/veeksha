@@ -3,7 +3,7 @@ import os
 import time
 from typing import Dict, Optional, Tuple
 
-import aiohttp
+import aiohttp  # type: ignore
 
 from veeksha.core.llm_clients.base_llm_client import BaseLLMClient
 from veeksha.core.llm_clients.streaming_mixin import StreamingMixin
@@ -232,6 +232,7 @@ class OpenAIChatCompletionsClient(BaseLLMClient, StreamingMixin):
             num_output_tokens=tokens_received,
             error_code=error_response_code,
             error_msg=error_msg,
+            request_id=request_config.id,
         )
         
         logger.info(f"Request metrics: dispatched at {request_dispatched_at}, inter token times {inter_token_times}, prompt length {prompt_len}, output length {tokens_received}")

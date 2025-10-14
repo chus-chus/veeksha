@@ -1,5 +1,7 @@
 # Veeksha
 
+[![Publish Release to PyPI](https://github.com/project-vajra/veeksha/actions/workflows/publish_release.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/publish_release.yml) [![Deploy Documentation](https://github.com/project-vajra/veeksha/actions/workflows/deploy_docs.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/deploy_docs.yml) [![Test Suite](https://github.com/project-vajra/veeksha/actions/workflows/test_suite.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/test_suite.yml) [![Run Linters](https://github.com/project-vajra/veeksha/actions/workflows/lint.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/lint.yml)
+
 Veeksha is a LLM Inference systems benchmarking tool. Please refer to our [documentation](https://project-vajra.github.io/veeksha) and [paper](https://arxiv.org/abs/2407.07000) for more details.
 
 ## Setup

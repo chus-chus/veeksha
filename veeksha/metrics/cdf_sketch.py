@@ -159,7 +159,7 @@ class CDFSketch:
                 step=0,
             )
 
-        fig.save(f"{path}/{plot_name}.png")
+        fig.save(f"{path}/{plot_name}.png", transparent=False)
         self._save_df(df, path, plot_name)
 
     def get_summary(self) -> Dict[str, float]:

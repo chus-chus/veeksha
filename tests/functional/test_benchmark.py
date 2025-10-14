@@ -23,13 +23,13 @@ class TestBenchmarkFunctionality:
             model=test_model,
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
-            max_completed_requests=5,
-            timeout=60,
+            max_completed_requests=3,
+            timeout=30,
             request_generator_type="synthetic",
             length_generator_type="fixed",
             interval_generator_type="poisson",
-            prefill_tokens=30,
-            decode_tokens=10,
+            prefill_tokens=10,
+            decode_tokens=5,
             qps=0.5,
         )
 
@@ -45,14 +45,14 @@ class TestBenchmarkFunctionality:
             model=test_model,
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
-            max_completed_requests=5,
-            timeout=60,
+            max_completed_requests=3,
+            timeout=30,
             request_generator_type="synthetic",
             length_generator_type="uniform",
             interval_generator_type="gamma",
-            min_tokens=20,
-            max_tokens=60,
-            qps=1.0,
+            min_tokens=5,
+            max_tokens=10,
+            qps=0.5,
             cv=0.5,
         )
 
@@ -69,13 +69,13 @@ class TestBenchmarkFunctionality:
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
             max_completed_requests=3,
-            timeout=30,
+            timeout=20,
             request_generator_type="synthetic",
             length_generator_type="fixed",
             interval_generator_type="static",
-            prefill_tokens=25,
-            decode_tokens=15,
-            duration=1.0,
+            prefill_tokens=10,
+            decode_tokens=5,
+            duration=0.05,
         )
 
         runner.run_benchmark(config_content, "static_config.yml")
@@ -91,13 +91,13 @@ class TestBenchmarkFunctionality:
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
             max_completed_requests=3,
-            timeout=30,
+            timeout=20,
             request_generator_type="synthetic",
             length_generator_type="zipf",
             interval_generator_type="static",
-            min_tokens=10,
-            max_tokens=50,
-            duration=1.0,
+            min_tokens=5,
+            max_tokens=10,
+            duration=0.05,
             theta=1.0,
             scramble=True,
         )
@@ -115,13 +115,13 @@ class TestBenchmarkFunctionality:
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
             max_completed_requests=3,
-            timeout=60,
+            timeout=30,
             request_generator_type="synthetic",
             length_generator_type="trace",
             interval_generator_type="static",
             trace_file=sample_trace_file,
-            max_tokens=512,
-            duration=1.0,
+            max_tokens=128,
+            duration=0.05,
         )
 
         runner.run_benchmark(config_content, "trace_config.yml")
@@ -154,14 +154,14 @@ max_completed_requests: 1
             model=test_model,
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
-            max_completed_requests=5,
-            timeout=120,  # will be overridden to -1 for lmeval
+            max_completed_requests=3,
+            timeout=60,  # will be overridden to -1 for lmeval
             request_generator_type="lmeval",
             interval_generator_type="static",
-            duration=0.1,
+            duration=0.05,
             lmeval_tasks=["hellaswag"],
             lmeval_num_fewshot=0,
-            lmeval_limit=3,
+            lmeval_limit=1,
         )
 
         runner.run_benchmark(config_content, "lmeval_logit.yml")
@@ -191,14 +191,14 @@ max_completed_requests: 1
             model=test_model,
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
-            max_completed_requests=5,
-            timeout=120,
+            max_completed_requests=3,
+            timeout=60,
             request_generator_type="lmeval",
             interval_generator_type="static",
-            duration=0.1,
-            lmeval_tasks=["reversed_words"],
+            duration=0.05,
+            lmeval_tasks=["triviaqa"],
             lmeval_num_fewshot=0,
-            lmeval_limit=2,
+            lmeval_limit=1,
         )
 
         runner.run_benchmark(
@@ -245,7 +245,7 @@ max_completed_requests: 1
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
             max_completed_requests=3,
-            timeout=60,
+            timeout=30,
             request_generator_type="trace",
             trace_file="",
             max_tokens=512,
@@ -258,12 +258,12 @@ max_completed_requests: 1
             trace_block_size=2048,
             session_generator_config=session_gen_cfg,
             interval_generator_type="static",
-            duration=0.1,
+            duration=0.05,
         )
 
         runner.run_benchmark(config_content, "trace_sessions_session_gen.yml")
 
-        # Validate saved session trace fields
+        # Validate saved session trace fields (including session scheduling annotations)
         jsonl_files = list(Path(temp_output_dir).glob("**/*.jsonl"))
         assert len(jsonl_files) > 0, "No saved session trace found"
         trace_path = jsonl_files[0]
@@ -291,6 +291,11 @@ max_completed_requests: 1
             "Expected at least one request to have prefix cache match > 0"
         )
 
+        # New session scheduling fields should exist (generated by TraceRequestGenerator)
+        sched_keys = {"session_sequence_index", "wait_after_prev_response_s", "anchor_at_s"}
+        missing_sched = sched_keys - set(records[0].keys())
+        assert not missing_sched, f"Missing scheduling keys in saved session trace: {missing_sched}"
+
     @pytest.mark.gpu
     def test_benchmark_with_trace_sessions_from_trace(
         self, temp_output_dir: str, sample_trace_file: str, test_model: str, vllm_server
@@ -302,8 +307,8 @@ max_completed_requests: 1
             model=test_model,
             output_dir=temp_output_dir,
             api_url=vllm_server.base_url,
-            max_completed_requests=2,
-            timeout=30,
+            max_completed_requests=3,
+            timeout=20,
             request_generator_type="trace",
             trace_file="",
             max_tokens=256,
@@ -312,7 +317,7 @@ max_completed_requests: 1
             trace_use_prefix_hash_ids=True,
             trace_use_sessions=True,
             interval_generator_type="static",
-            duration=0.1,
+            duration=0.05,
         )
 
         runner.run_benchmark(

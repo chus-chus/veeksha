@@ -20,6 +20,7 @@ from veeksha.benchmark_data_utils import (
 from veeksha.config.benchmark import BenchmarkConfig
 from veeksha.config.client import ClientConfig
 from veeksha.config.utils import prepare_benchmark_output_dir
+from veeksha.core.dispatch_scheduler import DispatchScheduler
 from veeksha.core.hf_utils import get_tokenizer
 from veeksha.core.requests_launcher import RequestsLauncher
 from veeksha.core.response import Response
@@ -36,6 +37,10 @@ from veeksha.metrics.service_metrics import ServiceMetrics
 from veeksha.types import RequestGeneratorType
 
 logger = init_logger(__name__)
+
+PREFETCH_BATCH_SIZE = 1
+PREFETCH_INTERVAL_S = 0.001
+MAX_PREFETCH_BACKLOG = 20
 
 
 def setup_api_environment(
@@ -139,74 +144,64 @@ def dispatch_requests(
     service_metrics: ServiceMetrics,
     request_generator: BaseRequestGenerator,
     stop_event: threading.Event,
+    scheduler: DispatchScheduler,
 ) -> None:
     """Thread function to generate and dispatch requests."""
     num_errored_requests_handled = 0
-    # Empirical cumulative schedule in seconds since this thread started handling the first request
-    cumulative_empirical_timestamp = 0.0
+
+    # scheduler provided by caller
+    next_prefetch_time = 0.0
+    generator_exhausted = False
+    scheduled_backlog = 0
 
     while not stop_event.is_set():
-        if should_send_new_request(service_metrics, num_errored_requests_handled):
-            request_start_time = time.monotonic()
+        now = time.monotonic()
+        # Prefetch from generator if capacity allows
+        if (
+            (not generator_exhausted)
+            and should_send_new_request(service_metrics, num_errored_requests_handled)
+            and (scheduled_backlog < MAX_PREFETCH_BACKLOG)
+        ):
+            if now >= next_prefetch_time:
+                for _ in range(PREFETCH_BATCH_SIZE):
+                    if scheduled_backlog >= MAX_PREFETCH_BACKLOG:
+                        break
+                    try:
+                        request_config = request_generator.get_request()
+                    except StopIteration:
+                        # stop prefetching but keep dispatching already-scheduled
+                        generator_exhausted = True
+                        break
 
-            # check if we should handle error request
-            if service_metrics.num_requests >= service_metrics.max_requests:
-                num_errored_requests_handled += 1
+                    if request_config.dispatch_delay == -1:
+                        logger.info(
+                            "Benchmark ending early due to stop policy (generator sentinel received)."
+                        )
+                        service_metrics.request_stop()
+                        stop_event.set()
+                        break
+                    elif request_config.dispatch_delay < 0:
+                        raise ValueError(
+                            f"Invalid request dispatch delay '{request_config.dispatch_delay}' from request metadata."
+                        )
 
-            # get next request and its dispatch time
-            try:
-                req_tuple = request_generator.get_request()
-                request_config, input_length, output_length, next_timestamp = cast(
-                    Tuple["RequestConfig", int, int, float], req_tuple
-                )
-            except StopIteration as e:
-                service_metrics.notify_error(e)
-                stop_event.set()
-                break
-            request_dispatch_delay = request_config.dispatch_delay
+                    scheduler.add_request(request_config)
+                    scheduled_backlog += 1
+                next_prefetch_time = now + PREFETCH_INTERVAL_S
 
-            if request_dispatch_delay == -1:
-                logger.info(
-                    "Benchmark ending early due to stop policy (generator sentinel received)."
-                )
-                service_metrics.request_stop()
-                stop_event.set()
-                break
-            elif request_dispatch_delay < 0:
-                raise ValueError(
-                    f"Invalid request dispatch delay '{request_dispatch_delay}' from request metadata."
-                )
-
-            # wait for dispatch time
-            while not stop_event.is_set():
-                elapsed_time = time.monotonic() - request_start_time
-                if elapsed_time >= request_dispatch_delay:
-                    break
-                # remaining sleep time to avoid drift
-                remaining_time = request_dispatch_delay - elapsed_time
-                if remaining_time > 0:
-                    # capped sleep at 100ms
-                    sleep_duration = min(remaining_time, 0.1)
-                    time.sleep(sleep_duration)
-
-            # if another thread has set the stop event we don't send the request
-            if stop_event.is_set():
-                continue
-
-            # dispatch
+        # Attempt to pop a ready request
+        ready = scheduler.pop_ready()
+        if ready is not None:
             service_metrics.register_launched_request()
-            # record enqueue time (absolute) and empirical scheduled time (cumulative elapsed)
-            now_mono = time.monotonic()
-            empirical_delay = now_mono - request_start_time
-            request_config.enqueued_at = now_mono
-            request_config.scheduled_timestamp = cumulative_empirical_timestamp + empirical_delay
-            cumulative_empirical_timestamp = request_config.scheduled_timestamp
-            input_queue.put(request_config)
-            logger.info(
-                f"Dispatched request {request_config.id}, in {input_length}, out {output_length}, enqueued at {request_config.enqueued_at}, scheduled at {request_config.scheduled_timestamp}, (mono - start_time = {empirical_delay}), theoretical dispatch delay {request_dispatch_delay}"
-            )
-        else:
-            time.sleep(0.01)
+            input_queue.put(ready)
+            if scheduled_backlog > 0:
+                scheduled_backlog -= 1
+            logger.info(f"Dispatched request {ready.id}")
+            continue
+
+        time_until = scheduler.time_until_next_ready()
+        sleep_time = 0.01 if time_until is None else min(max(time_until, 0.0), 0.1)
+        time.sleep(sleep_time)
 
 
 def process_results(
@@ -215,6 +210,7 @@ def process_results(
     generated_responses: List[Response],
     pbar: tqdm,
     stop_event: threading.Event,
+    scheduler: DispatchScheduler,
 ) -> None:
     """Thread function to process results from the output queue."""
     # On stop, attempt to drain for a short grace period, then exit
@@ -244,6 +240,16 @@ def process_results(
 
         request_metrics, generated_response = result
         service_metrics.add_request_metrics(request_metrics)
+        # notify scheduler about completion for session-aware sequencing
+        success = (
+            getattr(request_metrics, "error_code", None) is None
+            and getattr(request_metrics, "error_msg", None) is None
+        )
+        scheduler.notify_completion(
+            request_id=request_metrics.request_id,
+            completed_at_monotonic=time.monotonic(),
+            success=success,
+        )
         if generated_response is not None:
             generated_responses.append(generated_response)
 
@@ -265,6 +271,7 @@ def run_main_loop(
     input_queue = Queue()
     output_queue = Queue()
     stop_event = threading.Event()
+    scheduler = DispatchScheduler()
 
     # Initialize request launcher with a readiness queue
     ready_queue = Queue()
@@ -291,6 +298,7 @@ def run_main_loop(
             service_metrics,
             request_generator,
             stop_event,
+            scheduler,
         ),
     )
 
@@ -302,6 +310,7 @@ def run_main_loop(
             generated_responses,
             pbar,
             stop_event,
+            scheduler,
         ),
     )
 

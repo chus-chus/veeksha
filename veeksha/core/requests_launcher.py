@@ -6,7 +6,7 @@ from queue import Empty
 from typing import Any, Callable, List, Optional
 import time
 
-import aiohttp
+import aiohttp  # type: ignore
 
 from veeksha.config.client import ClientConfig
 from veeksha.core.llm_clients import construct_client
@@ -187,18 +187,12 @@ class RequestsLauncher:
             task_id: ID of the worker task within the client.
         """
         try:
-            try:
-                prompt_len = (
-                    request_config.prompt[1]
-                    if request_config and getattr(request_config, "prompt", None)
-                    else 0
-                )
-            except Exception:
-                prompt_len = 0
+            prompt_len = request_config.prompt[1] if request_config is not None else 0
 
-            error_code = (
-                e.status if isinstance(e, aiohttp.ClientResponseError) else None
-            )
+            error_code = None
+            if isinstance(e, aiohttp.ClientResponseError):
+                # aiohttp types may be unavailable to the type checker in some envs
+                error_code = e.status  # type: ignore[attr-defined]
             metrics = RequestMetrics(
                 request_dispatched_at=0.0,
                 inter_token_times=[],
@@ -206,6 +200,7 @@ class RequestsLauncher:
                 num_output_tokens=0,
                 error_msg=str(e),
                 error_code=error_code,
+                request_id=request_config.id if request_config else None,
             )
             await loop.run_in_executor(None, put_to_queue, (metrics, None))
         except Exception:

@@ -282,6 +282,7 @@ class OpenAICompletionsClient(BaseLLMClient, StreamingMixin):
             num_output_tokens=tokens_received,
             error_code=error_response_code,
             error_msg=error_msg,
+            request_id=request_config.id,
         )
 
         generated_response: Optional[Response]
