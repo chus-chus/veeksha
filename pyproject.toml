@@ -46,8 +46,8 @@ dependencies = [
 veeksha = "veeksha.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/project-vajra/veeksha"
-Documentation = "https://project-vajra.github.io/veeksha"
+Homepage = "https://github.com/chus-chus/veeksha"
+Documentation = "https://veeksha.readthedocs.io/en/latest/"
 
 [dependency-groups]
 dev = [

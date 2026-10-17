@@ -1,9 +1,10 @@
 Installation
 ============
 
-You can run Veeksha without explicit installation using ``uvx``.:
+You can run Veeksha without explicit installation using ``uvx``:
 
 .. code-block:: bash
+
    uvx -p 3.14t veeksha benchmark ...
 
 Veeksha requires free-threaded Python ``>=3.14``.
@@ -47,6 +48,6 @@ If you want to install from the latest source code or contribute to development:
 
 .. code-block:: bash
 
-   git clone https://github.com/project-vajra/veeksha.git
+   git clone https://github.com/chus-chus/veeksha.git
    cd veeksha
    uv pip install -e .

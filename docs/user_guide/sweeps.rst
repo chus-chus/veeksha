@@ -131,9 +131,9 @@ Sweep summary
 
 Veeksha automatically generates summary files at the end of each sweep:
 
-**sweep_summary.json** aggregates key metrics across all runs:
+**sweep_summary.json** aggregates key metrics across all runs (abbreviated below):
 
-.. code-block:: json
+.. code-block:: text
 
     {
       "base_output_dir": "benchmark_output/sweep_09:01:2026-16:38:22",

@@ -1,6 +1,6 @@
 # Veeksha
 
-[![Publish Release to PyPI](https://github.com/project-vajra/veeksha/actions/workflows/publish_release.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/publish_release.yml) [![Deploy Documentation](https://github.com/project-vajra/veeksha/actions/workflows/deploy_docs.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/deploy_docs.yml) [![Test Suite](https://github.com/project-vajra/veeksha/actions/workflows/test_veeksha.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/test_veeksha.yml) [![Run Linters](https://github.com/project-vajra/veeksha/actions/workflows/lint.yml/badge.svg)](https://github.com/project-vajra/veeksha/actions/workflows/lint.yml)
+[![Publish Release to PyPI](https://github.com/chus-chus/veeksha/actions/workflows/publish_release.yml/badge.svg)](https://github.com/chus-chus/veeksha/actions/workflows/publish_release.yml) [![Documentation](https://readthedocs.org/projects/veeksha/badge/?version=latest)](https://veeksha.readthedocs.io/en/latest/) [![Test Suite](https://github.com/chus-chus/veeksha/actions/workflows/test_veeksha.yml/badge.svg?branch=main)](https://github.com/chus-chus/veeksha/actions/workflows/test_veeksha.yml) [![Run Linters](https://github.com/chus-chus/veeksha/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/chus-chus/veeksha/actions/workflows/lint.yml)
 
 **Veeksha** is a high-fidelity benchmarking framework for LLM inference systems.
 Whether you're optimizing a production deployment, comparing serving backends, or
@@ -10,8 +10,8 @@ microbenchmarks. One tool, any workload.
 
 **From isolated requests to complex agentic sessions, Veeksha captures the full complexity of modern LLM workloads.**
 
-👉 **[Why Veeksha?](https://project-vajra.github.io/veeksha/getting_started/why_veeksha.html)** — Learn what sets Veeksha apart  
-📚 **[Documentation](https://project-vajra.github.io/veeksha)** — Full guides and API reference
+👉 **[Why Veeksha?](https://veeksha.readthedocs.io/en/latest/getting_started/why_veeksha.html)** — Learn what sets Veeksha apart\
+📚 **[Documentation](https://veeksha.readthedocs.io/en/latest)** — Full guides and API reference
 
 ## Quick start
 
@@ -41,7 +41,7 @@ We require free-threaded Python for worker parallelism.
 ## Installation from source
 
 ```bash
-git clone https://github.com/project-vajra/veeksha.git
+git clone https://github.com/chus-chus/veeksha.git
 cd veeksha
 
 # Install uv if needed
@@ -52,3 +52,5 @@ uv venv --python 3.14t
 source .venv/bin/activate
 uv pip install -e .
 ```
+
+> Veeksha was developed within project-vajra, with contributions from the [project team](https://github.com/chus-chus/veeksha/graphs/contributors?all=1).
