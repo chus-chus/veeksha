@@ -1,4 +1,4 @@
-
+import time
 import pytest  # type: ignore[import]
 from veeksha.orchestration.resource_manager import ResourceManager, NodeInfo, GPUInfo
 
@@ -126,6 +126,10 @@ class TestResourceManager:
         """Test wait_for_resources timeout."""
         rm = ResourceManager(detect_gpus=False)
         rm.add_node("node1", num_gpus=1, gpu_memory_mb=24000)
-        
-        allocation = rm.wait_for_resources(num_gpus=2, timeout=0.1, poll_interval=0.05)
+
+        start = time.monotonic()
+        allocation = rm.wait_for_resources(num_gpus=2, timeout=0.1, poll_interval=1.0)
+        elapsed = time.monotonic() - start
+
         assert allocation is None
+        assert elapsed < 0.3

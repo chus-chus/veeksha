@@ -425,23 +425,38 @@ class ResourceManager:
         Returns:
             ResourceMapping if successful, None if timeout
         """
-        start_time = time.time()
+        start_time = time.monotonic()
 
         while True:
+            elapsed = time.monotonic() - start_time
+
             # check timeout before attempting allocation
-            if timeout is not None and (time.time() - start_time) >= timeout:
+            if timeout is not None and elapsed >= timeout:
                 logger.warning(f"Timeout waiting for {num_gpus} GPUs after {timeout}s")
                 return None
 
-            resource_mapping = self.allocate_resources(
-                num_gpus,
-                job_id=job_id,
-                contiguous=contiguous,
-            )
-            if resource_mapping:
-                return resource_mapping
+            total_gpus = self.get_total_gpus()
+            free_gpus = self.get_free_gpus()
+
+            # While waiting, avoid repeatedly logging allocation failures when the
+            # cluster is too small or currently too busy to satisfy the request.
+            if num_gpus <= total_gpus and num_gpus <= free_gpus:
+                resource_mapping = self.allocate_resources(
+                    num_gpus,
+                    job_id=job_id,
+                    contiguous=contiguous,
+                )
+                if resource_mapping:
+                    return resource_mapping
 
             logger.debug(
-                f"Waiting for {num_gpus} GPUs... (free: {self.get_free_gpus()})"
+                f"Waiting for {num_gpus} GPUs... (free: {free_gpus}, total: {total_gpus})"
             )
-            time.sleep(poll_interval)
+
+            sleep_duration = poll_interval
+            if timeout is not None:
+                remaining = timeout - elapsed
+                sleep_duration = min(poll_interval, max(0.0, remaining))
+
+            if sleep_duration > 0:
+                time.sleep(sleep_duration)
