@@ -1,6 +1,6 @@
 # Veeksha
 
-[![Publish Release to PyPI](https://github.com/chus-chus/veeksha/actions/workflows/publish_release.yml/badge.svg)](https://github.com/chus-chus/veeksha/actions/workflows/publish_release.yml) [![Documentation](https://readthedocs.org/projects/veeksha/badge/?version=latest)](https://veeksha.readthedocs.io/en/latest/) [![Test Suite](https://github.com/chus-chus/veeksha/actions/workflows/test_veeksha.yml/badge.svg?branch=main)](https://github.com/chus-chus/veeksha/actions/workflows/test_veeksha.yml) [![Run Linters](https://github.com/chus-chus/veeksha/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/chus-chus/veeksha/actions/workflows/lint.yml)
+[![Documentation](https://readthedocs.org/projects/veeksha/badge/?version=latest)](https://veeksha.readthedocs.io/en/latest/)
 
 **Veeksha** is a high-fidelity benchmarking framework for LLM inference systems.
 Whether you're optimizing a production deployment, comparing serving backends, or
